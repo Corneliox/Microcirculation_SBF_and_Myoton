@@ -1,0 +1,60 @@
+name: Build Windows Standalone Executable
+
+on:
+  push:
+    branches: [ main, master ]
+    tags: [ 'v*' ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run unit test suite
+        run: |
+          python tests/test_pipeline.py
+
+      - name: Build Standalone .exe with PyInstaller
+        run: |
+          pyinstaller MicrocirculationApp.spec
+
+      - name: Verify executable artifact
+        run: |
+          dir dist
+
+      - name: Upload Windows Executable Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: MicrocirculationApp-Windows-x64
+          path: dist/MicrocirculationApp.exe
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Create GitHub Release (on tag)
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/MicrocirculationApp.exe
+          draft: false
+          prerelease: false
+          generate_release_notes: true
