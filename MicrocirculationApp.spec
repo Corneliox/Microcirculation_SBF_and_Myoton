@@ -34,7 +34,7 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=['torch', 'tensorflow', 'tensorboard', 'botocore', 'boto3', 'IPython', 'pytest', 'sphinx'],
     noarchive=False,
     optimize=0,
 )
