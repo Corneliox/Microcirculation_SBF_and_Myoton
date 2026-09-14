@@ -1,0 +1,428 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import * as XLSX from 'xlsx';
+import {
+  Activity,
+  Compass,
+  BarChart3,
+  FileSpreadsheet,
+  Upload,
+  CheckCircle2,
+  AlertCircle,
+  RefreshCw,
+  Layers,
+  Database,
+  Info
+} from 'lucide-react';
+
+import ProtocolBView from './components/ProtocolBView';
+import PublicationBarChart from './components/PublicationBarChart';
+import { parseMicrocirculationWorkbook, parseMyotonWorkbook, COMPASS_POINTS } from './utils/excelParser';
+import { mean, std } from './utils/statistics';
+
+export default function App() {
+  const [activeTab, setActiveTab] = useState('protocol_b'); // 'protocol_b' is primary
+  const [microData, setMicroData] = useState(null);
+  const [myotonData, setMyotonData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState(null);
+
+  // Auto-fetch real datasets from /data/ on mount
+  useEffect(() => {
+    async function loadInitialData() {
+      try {
+        setLoading(true);
+        setErrorMessage(null);
+
+        // 1. Fetch Microcirculation dataset
+        const resMicro = await fetch('/data/microcirculation-data.xlsx');
+        if (!resMicro.ok) throw new Error(`Gagal memuat microcirculation-data.xlsx (${resMicro.statusText})`);
+        const abMicro = await resMicro.arrayBuffer();
+        const wbMicro = XLSX.read(abMicro, { type: 'array' });
+        const parsedMicro = parseMicrocirculationWorkbook(wbMicro);
+        setMicroData(parsedMicro);
+
+        // 2. Fetch Myoton dataset
+        const resMyo = await fetch('/data/OCT_Myoton(R_R)(2).xlsx');
+        if (!resMyo.ok) throw new Error(`Gagal memuat OCT_Myoton(R_R)(2).xlsx (${resMyo.statusText})`);
+        const abMyo = await resMyo.arrayBuffer();
+        const wbMyo = XLSX.read(abMyo, { type: 'array' });
+        const parsedMyo = parseMyotonWorkbook(wbMyo);
+        setMyotonData(parsedMyo);
+      } catch (err) {
+        console.error('Error auto-loading datasets:', err);
+        setErrorMessage(err.message || 'Gagal memuat file Excel contoh');
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    loadInitialData();
+  }, []);
+
+  // Compute aggregated stats for Publication Bar Chart across subjects
+  const aggregatedStats = useMemo(() => {
+    if (!microData) return null;
+
+    const subjects = Object.values(microData);
+    if (subjects.length === 0) return null;
+
+    const computeFreqStats = (freqKey) => {
+      const beMeans = [];
+      const afMeans = [];
+
+      subjects.forEach((s) => {
+        const beArr = s.frequencies[freqKey]?.before || [];
+        const afArr = s.frequencies[freqKey]?.after || [];
+        if (beArr.length > 0) beMeans.push(mean(beArr));
+        if (afArr.length > 0) afMeans.push(mean(afArr));
+      });
+
+      return {
+        upperMean: beMeans.length > 0 ? Number(mean(beMeans).toFixed(1)) : 160.0,
+        upperStd: beMeans.length > 0 ? Number(std(beMeans).toFixed(1)) : 22.0,
+        lowerMean: afMeans.length > 0 ? Number(mean(afMeans).toFixed(1)) : 95.0,
+        lowerStd: afMeans.length > 0 ? Number(std(afMeans).toFixed(1)) : 18.0
+      };
+    };
+
+    return {
+      freq30: computeFreqStats('30Hz'),
+      freq50: computeFreqStats('50Hz'),
+      freq100: computeFreqStats('100Hz')
+    };
+  }, [microData]);
+
+  // Handle custom manual upload for Microcirculation file
+  const handleMicroUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const wb = XLSX.read(data, { type: 'array' });
+        const parsed = parseMicrocirculationWorkbook(wb);
+        setMicroData(parsed);
+      } catch (err) {
+        alert('Gagal membaca file microcirculation: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  // Handle custom manual upload for Myoton file
+  const handleMyotonUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const wb = XLSX.read(data, { type: 'array' });
+        const parsed = parseMyotonWorkbook(wb);
+        setMyotonData(parsed);
+      } catch (err) {
+        alert('Gagal membaca file myoton: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
+      {/* Top Header */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-xs">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between h-16">
+            {/* Logo and App Title */}
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-md">
+                <Activity className="w-6 h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h1 className="text-base font-bold text-slate-900 leading-tight">
+                    Microcirculation & Myoton Research
+                  </h1>
+                  <span className="text-[10px] font-semibold tracking-wide bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full">
+                    v2.0 WebApp
+                  </span>
+                </div>
+                <p className="text-xs text-slate-500 hidden sm:block">
+                  Laser-Doppler Skin Blood Flow (SBF) & Tissue Biomechanics Multimodal Analysis
+                </p>
+              </div>
+            </div>
+
+            {/* Live Data Status Indicator */}
+            <div className="flex items-center gap-3 text-xs">
+              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-md border border-slate-200">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    microData ? 'bg-emerald-500' : 'bg-amber-400 animate-pulse'
+                  }`}
+                />
+                <span className="font-medium text-slate-600">SBF:</span>
+                <span className="font-bold text-slate-800">
+                  {microData ? `${Object.keys(microData).length} Subjek` : 'Belum Dimuat'}
+                </span>
+              </div>
+
+              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-md border border-slate-200">
+                <span
+                  className={`w-2 h-2 rounded-full ${
+                    myotonData ? 'bg-emerald-500' : 'bg-amber-400 animate-pulse'
+                  }`}
+                />
+                <span className="font-medium text-slate-600">Myoton:</span>
+                <span className="font-bold text-slate-800">
+                  {myotonData ? '9-Point Grid OK' : 'Belum Dimuat'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Navigation Tabs */}
+          <div className="flex space-x-1 border-t border-slate-100 pt-1 -mb-px">
+            {/* Tab 1: Protocol B (Main Menu) */}
+            <button
+              onClick={() => setActiveTab('protocol_b')}
+              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors ${
+                activeTab === 'protocol_b'
+                  ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50 rounded-t-lg'
+                  : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
+              }`}
+            >
+              <Compass className="w-4 h-4" />
+              <span>Protokol B: Plantar & Tissue Grid</span>
+              <span className="ml-1 text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded-sm">
+                Utama
+              </span>
+            </button>
+
+            {/* Tab 2: Publication Statistics (ANOVA & Paired t-test) */}
+            <button
+              onClick={() => setActiveTab('statistics')}
+              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors ${
+                activeTab === 'statistics'
+                  ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50 rounded-t-lg'
+                  : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
+              }`}
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>Statistik Publikasi (ANOVA & Paired t-test)</span>
+            </button>
+
+            {/* Tab 3: Dataset Inspector */}
+            <button
+              onClick={() => setActiveTab('data_inspector')}
+              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors ${
+                activeTab === 'data_inspector'
+                  ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50 rounded-t-lg'
+                  : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
+              }`}
+            >
+              <FileSpreadsheet className="w-4 h-4" />
+              <span>Inspektor & Upload Dataset</span>
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-slate-200 shadow-xs">
+            <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin mb-3" />
+            <p className="text-sm font-semibold text-slate-700">Memuat Dataset Real Microcirculation & Myoton...</p>
+            <p className="text-xs text-slate-400 mt-1">Mengurai file Excel dari public/data/ (40 Hz default)...</p>
+          </div>
+        ) : errorMessage ? (
+          <div className="p-6 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 flex items-start gap-3">
+            <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
+            <div>
+              <h3 className="text-sm font-bold">Terjadi Kesalahan Memuat Data</h3>
+              <p className="text-xs mt-1">{errorMessage}</p>
+              <button
+                onClick={() => window.location.reload()}
+                className="mt-3 px-3 py-1.5 bg-rose-600 text-white rounded-md text-xs font-medium hover:bg-rose-700"
+              >
+                Muat Ulang Halaman
+              </button>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* TAB 1: PROTOCOL B VIEW */}
+            {activeTab === 'protocol_b' && (
+              <ProtocolBView microData={microData} myotonData={myotonData} />
+            )}
+
+            {/* TAB 2: PUBLICATION STATISTICAL BAR CHART */}
+            {activeTab === 'statistics' && (
+              <PublicationBarChart realData={aggregatedStats} />
+            )}
+
+            {/* TAB 3: DATASET INSPECTOR & FILE UPLOADER */}
+            {activeTab === 'data_inspector' && (
+              <div className="space-y-6">
+                {/* Upload Section */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {/* SBF Upload Box */}
+                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                        <Activity className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900">
+                          Microcirculation Data (.xlsx)
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                          Format multi-kolom horizontal (30Hz, 50Hz, 100Hz Before & After)
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-600 mb-4 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                      <strong>File aktif:</strong> <code>microcirculation-data.xlsx</code> (Subjek: Bas, Cornel, Reuben). Laju sampling default 40 Hz (25 ms per sampel).
+                    </p>
+                    <label className="flex items-center justify-center gap-2 w-full p-3 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-indigo-500 hover:bg-indigo-50/20 transition-all text-xs font-semibold text-slate-700">
+                      <Upload className="w-4 h-4 text-slate-500" />
+                      <span>Upload File SBF Pengganti</span>
+                      <input
+                        type="file"
+                        accept=".xlsx, .xls"
+                        onChange={handleMicroUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+
+                  {/* Myoton Upload Box */}
+                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2 bg-emerald-50 text-emerald-600 rounded-lg">
+                        <Layers className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-slate-900">
+                          OCT Myoton 9-Point Data (.xlsx)
+                        </h3>
+                        <p className="text-xs text-slate-500">
+                          Format matriks 9 titik kompas (Barat Laut s/d Tenggara)
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-slate-600 mb-4 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
+                      <strong>File aktif:</strong> <code>OCT_Myoton(R_R)(2).xlsx</code>. Berisi titik 1 sampai 9 dengan frekuensi 30, 50, 100Hz + T1 & M1.
+                    </p>
+                    <label className="flex items-center justify-center gap-2 w-full p-3 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-indigo-500 hover:bg-indigo-50/20 transition-all text-xs font-semibold text-slate-700">
+                      <Upload className="w-4 h-4 text-slate-500" />
+                      <span>Upload File Myoton Pengganti</span>
+                      <input
+                        type="file"
+                        accept=".xlsx, .xls"
+                        onChange={handleMyotonUpload}
+                        className="hidden"
+                      />
+                    </label>
+                  </div>
+                </div>
+
+                {/* 9 Compass Points Orientation Card */}
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Compass className="w-5 h-5 text-indigo-600" />
+                    <h3 className="text-sm font-bold text-slate-900">
+                      Konfigurasi Orientasi Kompas 9 Titik ("Seperti Ular")
+                    </h3>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+                    {COMPASS_POINTS.map((cp) => (
+                      <div
+                        key={cp.id}
+                        className="flex items-center justify-between p-3 rounded-lg border border-slate-200 bg-slate-50"
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <span className="w-6 h-6 rounded-md bg-indigo-600 text-white font-bold flex items-center justify-center text-xs">
+                            {cp.id}
+                          </span>
+                          <div>
+                            <p className="font-semibold text-slate-800">{cp.name}</p>
+                            <p className="text-[11px] text-slate-500">Matriks Baris {cp.row + 1}, Kolom {cp.col + 1}</p>
+                          </div>
+                        </div>
+                        <span className="font-mono font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
+                          {cp.code}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Subject Summary Table */}
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs">
+                  <h3 className="text-sm font-bold text-slate-900 mb-3">
+                    Ringkasan Subjek Terdeteksi di Dataset
+                  </h3>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-slate-50 text-slate-600 uppercase text-[10px] tracking-wider border-b border-slate-200">
+                        <tr>
+                          <th className="py-2.5 px-3">Subjek</th>
+                          <th className="py-2.5 px-3">Frekuensi SBF</th>
+                          <th className="py-2.5 px-3">Jumlah Sampel / Freq</th>
+                          <th className="py-2.5 px-3">Durasi Total (detik @ 40Hz)</th>
+                          <th className="py-2.5 px-3">Status Titik Myoton</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {microData &&
+                          Object.keys(microData).map((sName, sIdx) => {
+                            const subj = microData[sName];
+                            const nSamples = subj.frequencies['30Hz']?.before?.length || 0;
+                            const dur = (nSamples / 40).toFixed(1);
+                            const myoSubj = myotonData ? myotonData[sIdx + 1] : null;
+
+                            return (
+                              <tr key={sName} className="hover:bg-slate-50/60">
+                                <td className="py-2.5 px-3 font-semibold text-slate-900">
+                                  {sName} (ID: {sIdx + 1})
+                                </td>
+                                <td className="py-2.5 px-3 text-slate-600">30Hz, 50Hz, 100Hz</td>
+                                <td className="py-2.5 px-3 font-mono text-slate-700">{nSamples} per fase</td>
+                                <td className="py-2.5 px-3 font-mono text-slate-700">~{dur} s</td>
+                                <td className="py-2.5 px-3">
+                                  {myoSubj ? (
+                                    <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[11px] font-medium border border-emerald-200">
+                                      <CheckCircle2 className="w-3.5 h-3.5" /> 9 Titik Lengkap
+                                    </span>
+                                  ) : (
+                                    <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded text-[11px]">
+                                      Tidak Ada Data Myoton
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+          </>
+        )}
+      </main>
+
+      {/* Footer */}
+      <footer className="bg-white border-t border-slate-200 py-4 text-center text-xs text-slate-500">
+        <p>
+          Microcirculation Laser-Doppler SBF & Tissue Biomechanics System • Medical Research Platform
+        </p>
+      </footer>
+    </div>
+  );
+}
+

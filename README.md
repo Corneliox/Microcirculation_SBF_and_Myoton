@@ -19,7 +19,31 @@ This research software integrates optical microcirculation measurements with mec
 
 ---
 
-## ✨ Features & Protocol Capabilities
+## ✨ Features & Capabilities
+
+### 🦶 Protocol B: Plantar & Tissue Multimodal Grid (Main Application Focus)
+* **Interactive React WebApp (`webapp/`):** Instant browser-based multimodal analytics with one-click real data loading.
+* **9-Point Anatomical Compass Grid ("Snake" Sequence):**
+  1. **Barat Laut (NW)**: [Row 1, Col 1]
+  2. **Utara (N)**: [Row 1, Col 2]
+  3. **Timur Laut (NE)**: [Row 1, Col 3]
+  4. **Barat (W)**: [Row 2, Col 1]
+  5. **Tengah (C)**: [Row 2, Col 2]
+  6. **Timur (E)**: [Row 2, Col 3]
+  7. **Barat Daya (SW)**: [Row 3, Col 1]
+  8. **Selatan (S)**: [Row 3, Col 2]
+  9. **Tenggara (SE)**: [Row 3, Col 3]
+* **Sampling Rate & Dwell Configuration:**
+  * Default sampling frequency: **40 Hz** (1 sample = 0.025 s / 25 ms).
+  * Fully configurable sampling rate ($f_s$) and dwell separation window duration (seconds).
+* **Dual Spatial Heatmaps:** Side-by-side $3 \times 3$ interactive matrix of $\Delta\text{Flux}$ (PU) vs $\Delta\text{Stiffness}$ (N/m).
+* **Spatial Concordance Metrics:** Automatic computation of Spearman rank correlation ($\rho$) and Pearson ($r$) between vascular perfusion and biomechanical stiffness.
+* **Artifact-Resistant Estimators:** Choice of 25th-percentile (P25) resting dwell plateau, Median, or Mean.
+
+### 📊 Statistical Comparison (ANOVA & Paired t-test)
+* **Publication-Grade Visualization:** Replicates scientific publication standards (Upper Limb vs Lower Limb / Baseline vs Post-Stimulation across frequencies).
+* **Statistical Rigor:** One-way repeated measures ANOVA ($F$-statistic, $p$-value, effect size $\eta^2$) and paired Student's t-test with significance brackets (`*`, `**`, `***`, `ns`).
+* **Mean ± SD Error Bars:** Clean scientific bar charts with high-resolution SVG export.
 
 ### 📊 Protocol A: SBF Frequency Dynamics (50 Hz vs 100 Hz)
 * **Multi-Format Input:** Ingests horizontal-block Excel workbooks (`[Name] [50Hz] [be] [af] [100Hz] [be] [af]`) or batch raw signal `.txt` folders.
@@ -30,18 +54,6 @@ This research software integrates optical microcirculation measurements with mec
 * **Hemodynamic Bucketing:** Segments post-stimulus signals into 30-second temporal windows (up to 5 minutes / 10 buckets) to quantify relative change % ($\Delta SBF$) and vasodilation kinetics (slope per second, $R^2$).
 * **Paired Comparison:** Computes Shapiro-Wilk normality tests followed by paired Student's t-test and Wilcoxon signed-rank tests per time window.
 * **Export:** One-click generation of formatted Excel workbooks containing condition tables, group statistics, and p-values.
-
-### 🦶 Protocol B: Plantar Multimodal Grid (Flux + Myoton)
-* **9-Point Dwell Segmentation:** Synchronizes ~40 Hz laser-Doppler flux signals with timestamp events from Myoton recordings across 9 anatomical grid sites:
-  $$\text{Grid Sequence: } [5, 2, 6, 8, 4, 3, 9, 7, 1]$$
-* **Artifact-Resistant Estimator:** Features a **25th-percentile (P25) resting dwell estimator** that systematically suppresses probe-placement upward spikes, outperforming simple window medians.
-* **Dual Spatial Heatmaps:** Renders side-by-side $3 \times 3$ matrices displaying $\Delta\text{Flux}$ (PU) and $\Delta\text{Stiffness}$ (N/m).
-* **Spatial Concordance:** Evaluates Spearman rank correlation ($\rho$) and Pearson ($r$) between microcirculation changes and biomechanical softening/stiffening.
-* **Trace QC:** Generates detailed time-series traces highlighting coordinate window boundaries and dwell plateaus.
-
-### 🧪 Protocol C: Statistical Robustness & Sensitivity
-* **Jackknife Simulation:** Leave-one-out subject removal to verify whether group trends are driven by single outlier subjects.
-* **ANOVA & Post-Hoc:** One-way ANOVA with effect sizes ($\eta^2$).
 
 ---
 
