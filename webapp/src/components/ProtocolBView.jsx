@@ -10,7 +10,10 @@ import {
   HelpCircle,
   TrendingDown,
   TrendingUp,
-  RotateCcw
+  RotateCcw,
+  Cpu,
+  Terminal,
+  Play
 } from 'lucide-react';
 import CompassHeatmap from './CompassHeatmap';
 import { segmentMicrocirculationSignal, computeMultimodalGridResults, COMPASS_POINTS } from '../utils/excelParser';
@@ -24,6 +27,12 @@ export default function ProtocolBView({ microData, myotonData }) {
   const [samplingRateHz, setSamplingRateHz] = useState(40.0); // 40 Hz = 25 ms
   const [dwellDurationSec, setDwellDurationSec] = useState(7.41); // default ~7.41s for 9 points from 2670 samples
   const [dwellEstimator, setDwellEstimator] = useState('p25'); // 'p25', 'median', 'mean'
+
+  // Python Backend IPC State (when running in Electron desktop)
+  const [pythonResult, setPythonResult] = useState(null);
+  const [isPythonRunning, setIsPythonRunning] = useState(false);
+  const [pythonError, setPythonError] = useState(null);
+  const isElectron = typeof window !== 'undefined' && !!window.electronAPI?.isElectron;
 
   // Compute 9-point dwells and correlations
   const analysisResult = useMemo(() => {
@@ -62,6 +71,32 @@ export default function ProtocolBView({ microData, myotonData }) {
     );
   }
 
+  const handleRunPythonBackend = async () => {
+    if (!window.electronAPI?.runPythonAnalysis) return;
+    setIsPythonRunning(true);
+    setPythonError(null);
+    try {
+      const subjectNames = { 1: 'Bas', 2: 'Cornel', 3: 'Reuben' };
+      const sName = subjectNames[selectedSubjectId] || 'Bas';
+      const res = await window.electronAPI.runPythonAnalysis({
+        task: 'protocol_b_grid',
+        microFile: 'Example/Input_Real_ICha/microcirculation-data.xlsx',
+        myotonFile: 'Example/Input_Real_ICha/OCT_Myoton(R_R)(2).xlsx',
+        subject: sName,
+        freq: selectedFreq,
+        fs: samplingRateHz,
+        dwellDuration: dwellDurationSec,
+        estimator: dwellEstimator
+      });
+      setPythonResult(res);
+    } catch (err) {
+      console.error('Python execution failed:', err);
+      setPythonError(err.message || 'Python execution failed');
+    } finally {
+      setIsPythonRunning(false);
+    }
+  };
+
   const rho = analysisResult.correlations.deltaSpearman;
   const pearsonR = analysisResult.correlations.deltaPearson;
 
@@ -69,7 +104,7 @@ export default function ProtocolBView({ microData, myotonData }) {
     <div className="space-y-6">
       {/* Parameter Controls Bar */}
       <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-5">
-        <div className="flex items-center justify-between pb-4 mb-4 border-b border-gray-100">
+        <div className="flex flex-wrap items-center justify-between pb-4 mb-4 border-b border-gray-100 gap-2">
           <div className="flex items-center gap-2.5">
             <div className="p-2 bg-indigo-50 text-indigo-700 rounded-lg">
               <Compass className="w-5 h-5" />
@@ -83,11 +118,60 @@ export default function ProtocolBView({ microData, myotonData }) {
               </p>
             </div>
           </div>
-          <span className="text-xs font-semibold px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full flex items-center gap-1.5">
-            <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            Main Protocol Active
-          </span>
+          
+          <div className="flex items-center gap-2">
+            {isElectron ? (
+              <button
+                onClick={handleRunPythonBackend}
+                disabled={isPythonRunning}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-xs transition-all disabled:opacity-50"
+              >
+                {isPythonRunning ? (
+                  <RotateCcw className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Cpu className="w-3.5 h-3.5 text-emerald-400" />
+                )}
+                <span>{isPythonRunning ? 'Menjalankan Python...' : 'Run Python Backend (IPC)'}</span>
+              </button>
+            ) : (
+              <span className="text-[11px] font-semibold px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg flex items-center gap-1.5">
+                <Cpu className="w-3.5 h-3.5" />
+                JS Engine (Web Mode)
+              </span>
+            )}
+            
+            <span className="text-xs font-semibold px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded-full flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              Main Protocol Active
+            </span>
+          </div>
         </div>
+
+        {/* Python IPC Result Banner if executed */}
+        {pythonResult && (
+          <div className="mb-4 p-3.5 bg-emerald-50/80 border border-emerald-200 rounded-lg text-xs text-emerald-950 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <div className="p-1 bg-emerald-600 text-white rounded-md">
+                <CheckCircle className="w-4 h-4" />
+              </div>
+              <div>
+                <p className="font-bold">Python SciPy Core Execution Verified</p>
+                <p className="text-[11px] text-emerald-800">
+                  Spearman &rho; = {pythonResult.correlations.deltaSpearman} (p = {pythonResult.correlations.deltaSpearmanPValue}), Pearson r = {pythonResult.correlations.deltaPearson} (p = {pythonResult.correlations.deltaPearsonPValue})
+                </p>
+              </div>
+            </div>
+            <span className="font-mono text-[10px] bg-emerald-100/70 border border-emerald-300 text-emerald-900 px-2 py-0.5 rounded">
+              Backend Engine: {pythonResult.engine}
+            </span>
+          </div>
+        )}
+
+        {pythonError && (
+          <div className="mb-4 p-3 bg-rose-50 border border-rose-200 rounded-lg text-xs text-rose-800 flex items-center gap-2">
+            <span className="font-bold">Python IPC Error:</span> {pythonError}
+          </div>
+        )}
 
         {/* Inputs Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-xs">

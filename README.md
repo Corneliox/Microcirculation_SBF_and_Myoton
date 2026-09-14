@@ -57,37 +57,39 @@ This research software integrates optical microcirculation measurements with mec
 
 ---
 
-## 🏛️ Project Architecture
+## 🏛️ System Architecture (ThermalSight-Style Hybrid)
 
 ```
 06_Microcirculation_SBF_and_Myoton/
 │
 ├── .github/workflows/
-│   └── build-exe.yml              # CI/CD: Automated unit testing & Windows .exe builder
+│   ├── deploy-pages.yml           # Web Edition: Automatic deployment to GitHub Pages
+│   ├── build-electron.yml         # Desktop Edition: Windows Setup.exe builder (Electron + Python)
+│   └── build-exe.yml              # Python Standalone CLI/Tkinter builder
 │
-├── core/                          # Modular Computational Engine (Pure DSP & Statistics)
-│   ├── __init__.py
-│   ├── sbf_core.py                # SBFConfig, Hampel, Savitzky-Golay, Butterworth, Bucketing
-│   ├── sbf_horizontal.py          # Horizontal Excel parser (openpyxl & pandas)
-│   ├── sbf_txt.py                 # Batch TXT signal discovery and loading
-│   ├── sbf_multimodal.py          # 9-point plantar foot grid segmentation & Myoton joining
-│   ├── sbf_statistics.py          # ANOVA, eta-squared, Jackknife leave-one-out simulation
-│   └── sbf_viz.py                 # Reusable Matplotlib publication figure generators
+├── backend/                       # Python Scientific Core (SciPy, NumPy, Pandas)
+│   ├── analyzer_cli.py            # Headless CLI entrypoint & JSON IPC bridge for Electron
+│   ├── analyzer.spec              # PyInstaller specification for backend sidecar
+│   └── requirements.txt
 │
-├── app_gui.py                     # Standalone Desktop Application (CustomTkinter)
-├── MicrocirculationApp.spec       # PyInstaller standalone executable specification
+├── core/                          # Modular Pure DSP & Statistical Routines
+│   ├── sbf_core.py                # Hampel MAD, Savitzky-Golay, Butterworth, Bucketing
+│   ├── sbf_multimodal.py          # 9-point compass grid & Myoton registration
+│   ├── sbf_statistics.py          # ANOVA, Paired t-test, Jackknife simulation
+│   └── sbf_horizontal.py          # Multi-subject horizontal Excel parser
 │
-├── mock_data/                     # Realistic synthetic biomedical datasets for instant demo
-│   ├── generate_mock_data.py      # Synthetic signal generator
-│   ├── synthetic_horizontal_sbf.xlsx
-│   └── synthetic_plantar_grid/    # Mock Before/After flux & Myoton text files
+├── webapp/                        # Frontend Application & Desktop Shell
+│   ├── electron/                  # Electron Main Process & Native Bridge
+│   │   ├── main.cjs               # Window management & Python subprocess IPC
+│   │   └── preload.cjs            # Secure contextBridge (window.electronAPI)
+│   ├── src/                       # React 19 UI
+│   │   ├── components/            # ProtocolBView, PublicationBarChart, CompassHeatmap
+│   │   └── utils/                 # statistics.js, excelParser.js (Fast client-side engine)
+│   ├── package.json               # Scripts: dev, dev:electron, build, dist
+│   └── vite.config.js
 │
-├── tests/
-│   ├── __init__.py
-│   └── test_pipeline.py           # Automated unit test suite (100% passing)
-│
-├── legacy_scripts/                # Original archived collection of analysis scripts
-├── requirements.txt               # Python package dependencies
+├── Example/Input_Real_ICha/       # Real clinical datasets (microcirculation & Myoton)
+├── tests/test_pipeline.py         # Automated verification suite (100% passing)
 ├── .gitignore
 └── README.md
 ```
