@@ -34,7 +34,9 @@ export default function App() {
         setErrorMessage(null);
 
         // 1. Fetch Microcirculation dataset
-        const resMicro = await fetch('/data/microcirculation-data.xlsx');
+        const baseUrl = import.meta.env.BASE_URL || './';
+        const cleanBase = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
+        const resMicro = await fetch(`${cleanBase}data/microcirculation-data.xlsx`);
         if (!resMicro.ok) throw new Error(`Gagal memuat microcirculation-data.xlsx (${resMicro.statusText})`);
         const abMicro = await resMicro.arrayBuffer();
         const wbMicro = XLSX.read(abMicro, { type: 'array' });
@@ -42,7 +44,7 @@ export default function App() {
         setMicroData(parsedMicro);
 
         // 2. Fetch Myoton dataset
-        const resMyo = await fetch('/data/OCT_Myoton(R_R)(2).xlsx');
+        const resMyo = await fetch(`${cleanBase}data/OCT_Myoton(R_R)(2).xlsx`);
         if (!resMyo.ok) throw new Error(`Gagal memuat OCT_Myoton(R_R)(2).xlsx (${resMyo.statusText})`);
         const abMyo = await resMyo.arrayBuffer();
         const wbMyo = XLSX.read(abMyo, { type: 'array' });
