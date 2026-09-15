@@ -32,26 +32,59 @@ export const COMPASS_POINTS = [
 
 /**
  * Parses microcirculation-data.xlsx into structured subject and condition timeseries
+ * Automatically detects subject names, column offsets, and numeric data start.
  */
 export function parseMicrocirculationWorkbook(workbook) {
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
   const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-  // Scan header rows:
-  // Row 1: Subject names (e.g. Bas at Col 1, Cornel at Col 13, Reuben at Col 25)
-  // Row 2: Frequencies (1_30, 1_50, 1_100)
-  // Row 3: Phase (before, after)
-  // Row 4: Channels (Channel 1, Channel 2)
-  // Row 5+: Numeric signal samples
-  const subjects = [];
-  const subjectIndices = [];
+  if (!rawData || rawData.length < 4) {
+    throw new Error('Format lembar kerja SBF tidak valid (terlalu sedikit baris)');
+  }
 
-  for (let c = 1; c < rawData[1].length; c++) {
-    const val = rawData[1][c];
-    if (val && typeof val === 'string' && val.trim().length > 0) {
-      subjects.push({ name: val.trim(), startCol: c });
-      subjectIndices.push(c);
+  // 1. Detect Subject Header Row (Search rows 0, 1, 2)
+  let subjectRowIdx = 0;
+  let subjects = [];
+
+  for (let r = 0; r < Math.min(3, rawData.length); r++) {
+    const row = rawData[r];
+    if (!row) continue;
+    const detected = [];
+    for (let c = 0; c < row.length; c++) {
+      const val = row[c];
+      if (val && typeof val === 'string' && val.trim().length > 0) {
+        const v = val.trim();
+        // Exclude frequency markers or channel/phase labels
+        if (!v.match(/^\d+_\d+/) && !v.match(/channel/i) && !v.match(/^(before|after)$/i)) {
+          detected.push({ name: v, startCol: c });
+        }
+      }
+    }
+    if (detected.length > 0) {
+      subjectRowIdx = r;
+      subjects = detected;
+      break;
+    }
+  }
+
+  // Fallback if no subject row found: single subject named 'Subject_1'
+  if (subjects.length === 0) {
+    subjects = [{ name: 'Subject_1', startCol: 0 }];
+  }
+
+  // 2. Find the row where numeric time-series data begins
+  let dataStartRow = 4;
+  for (let r = subjectRowIdx + 1; r < Math.min(10, rawData.length); r++) {
+    const row = rawData[r];
+    if (!row) continue;
+    let numericCount = 0;
+    for (let c = 0; c < Math.min(row.length, 12); c++) {
+      if (typeof row[c] === 'number' && !isNaN(row[c])) numericCount++;
+    }
+    if (numericCount >= 2) {
+      dataStartRow = r;
+      break;
     }
   }
 
@@ -61,8 +94,10 @@ export function parseMicrocirculationWorkbook(workbook) {
     const s = subjects[sIdx];
     const sName = s.name;
     const baseCol = s.startCol;
+
     parsedSubjects[sName] = {
       name: sName,
+      id: sIdx + 1,
       frequencies: {
         '30Hz': { before: [], after: [] },
         '50Hz': { before: [], after: [] },
@@ -70,10 +105,10 @@ export function parseMicrocirculationWorkbook(workbook) {
       }
     };
 
-    // Frequency blocks are offset by 4 columns:
-    // 1_30: before = baseCol, after = baseCol + 2
-    // 1_50: before = baseCol + 4, after = baseCol + 6
-    // 1_100: before = baseCol + 8, after = baseCol + 10
+    // Standard frequency offsets (30Hz, 50Hz, 100Hz):
+    // 30Hz: before = baseCol, after = baseCol + 2
+    // 50Hz: before = baseCol + 4, after = baseCol + 6
+    // 100Hz: before = baseCol + 8, after = baseCol + 10
     const freqMap = [
       { key: '30Hz', beCol: baseCol, afCol: baseCol + 2 },
       { key: '50Hz', beCol: baseCol + 4, afCol: baseCol + 6 },
@@ -83,7 +118,7 @@ export function parseMicrocirculationWorkbook(workbook) {
     for (const f of freqMap) {
       const beSamples = [];
       const afSamples = [];
-      for (let r = 5; r < rawData.length; r++) {
+      for (let r = dataStartRow; r < rawData.length; r++) {
         const row = rawData[r];
         if (!row) continue;
         const vBe = parseFloat(row[f.beCol]);
@@ -100,28 +135,42 @@ export function parseMicrocirculationWorkbook(workbook) {
 }
 
 /**
- * Parses OCT_Myoton(R_R)(2).xlsx into structured 9-point grid datasets
+ * Parses OCT_Myoton(R_R)(2).xlsx into structured 9-point grid datasets.
+ * Dynamically detects subject markers and points 1-9 in snake compass order.
  */
 export function parseMyotonWorkbook(workbook) {
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
   const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
-  // In OCT_Myoton(R_R)(2).xlsx:
-  // Subject 1 is at rows 3-11
-  // Subject 2 is at rows 13-21
-  // Subject 3 is at rows 23-31
-  // Cols 1-6: before1_30, after1_30, before1_50, after1_50, before1_100, after1_100
-  // Cols 9-10: T1 before/after 1_30
-  // Cols 11-12: M1 before/after 1_30
+  const subjectSections = [];
 
-  const subjectSections = [
-    { name: 'Subject 1 (Bas)', startRow: 3, id: 1 },
-    { name: 'Subject 2 (Cornel)', startRow: 13, id: 2 },
-    { name: 'Subject 3 (Reuben)', startRow: 23, id: 3 }
-  ];
+  // Dynamically scan column 0 for subject header rows
+  for (let r = 0; r < rawData.length; r++) {
+    const row = rawData[r];
+    if (row && typeof row[0] === 'string') {
+      const txt = row[0].trim();
+      if (txt.toLowerCase().includes('subject') || txt.toLowerCase().includes('subjek')) {
+        subjectSections.push({
+          name: txt,
+          id: subjectSections.length + 1,
+          startRow: r + 1
+        });
+      }
+    }
+  }
+
+  // Fallback for files without explicit Subject row titles
+  if (subjectSections.length === 0) {
+    subjectSections.push(
+      { name: 'Subject 1', id: 1, startRow: 3 },
+      { name: 'Subject 2', id: 2, startRow: 13 },
+      { name: 'Subject 3', id: 3, startRow: 23 }
+    );
+  }
 
   const results = {};
+  const allSubjectIds = [];
 
   for (const s of subjectSections) {
     const sData = {
@@ -149,38 +198,94 @@ export function parseMyotonWorkbook(workbook) {
           '30Hz': {
             before: parseFloat(row[1]) || 0,
             after: parseFloat(row[2]) || 0,
-            delta: (parseFloat(row[2]) || 0) - (parseFloat(row[1]) || 0)
+            delta: Number(((parseFloat(row[2]) || 0) - (parseFloat(row[1]) || 0)).toFixed(1))
           },
           '50Hz': {
             before: parseFloat(row[3]) || 0,
             after: parseFloat(row[4]) || 0,
-            delta: (parseFloat(row[4]) || 0) - (parseFloat(row[3]) || 0)
+            delta: Number(((parseFloat(row[4]) || 0) - (parseFloat(row[3]) || 0)).toFixed(1))
           },
           '100Hz': {
             before: parseFloat(row[5]) || 0,
             after: parseFloat(row[6]) || 0,
-            delta: (parseFloat(row[6]) || 0) - (parseFloat(row[5]) || 0)
+            delta: Number(((parseFloat(row[6]) || 0) - (parseFloat(row[5]) || 0)).toFixed(1))
           }
         }
       };
 
-      // T1 & M1 measurements (if present)
       if (row[9] !== undefined || row[10] !== undefined) {
         sData.t1[pIdx] = {
           before: parseFloat(row[9]) || 0,
           after: parseFloat(row[10]) || 0,
-          delta: (parseFloat(row[10]) || 0) - (parseFloat(row[9]) || 0)
+          delta: Number(((parseFloat(row[10]) || 0) - (parseFloat(row[9]) || 0)).toFixed(1))
         };
       }
       if (row[11] !== undefined || row[12] !== undefined) {
         sData.m1[pIdx] = {
           before: parseFloat(row[11]) || 0,
           after: parseFloat(row[12]) || 0,
-          delta: (parseFloat(row[12]) || 0) - (parseFloat(row[11]) || 0)
+          delta: Number(((parseFloat(row[12]) || 0) - (parseFloat(row[11]) || 0)).toFixed(1))
         };
       }
     }
+
     results[s.id] = sData;
+    results[s.name] = sData;
+    allSubjectIds.push(s.id);
+  }
+
+  // Pre-calculate GROUP_AVERAGE across all detected subjects
+  if (allSubjectIds.length > 0) {
+    const groupData = {
+      name: `Group Average (N = ${allSubjectIds.length})`,
+      id: 'ALL',
+      points: {},
+      t1: {},
+      m1: {}
+    };
+
+    for (let pIdx = 1; pIdx <= 9; pIdx++) {
+      const compass = COMPASS_POINTS.find(cp => cp.id === pIdx);
+      const be30List = [], af30List = [];
+      const be50List = [], af50List = [];
+      const be100List = [], af100List = [];
+
+      allSubjectIds.forEach(id => {
+        const p = results[id]?.points[pIdx]?.frequencies;
+        if (p) {
+          be30List.push(p['30Hz'].before);
+          af30List.push(p['30Hz'].after);
+          be50List.push(p['50Hz'].before);
+          af50List.push(p['50Hz'].after);
+          be100List.push(p['100Hz'].before);
+          af100List.push(p['100Hz'].after);
+        }
+      });
+
+      const avg = arr => arr.length > 0 ? Number((arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1)) : 0;
+
+      const mBe30 = avg(be30List);
+      const mAf30 = avg(af30List);
+      const mBe50 = avg(be50List);
+      const mAf50 = avg(af50List);
+      const mBe100 = avg(be100List);
+      const mAf100 = avg(af100List);
+
+      groupData.points[pIdx] = {
+        pointId: pIdx,
+        compassName: compass.name,
+        compassCode: compass.code,
+        gridRow: compass.row,
+        gridCol: compass.col,
+        frequencies: {
+          '30Hz': { before: mBe30, after: mAf30, delta: Number((mAf30 - mBe30).toFixed(1)) },
+          '50Hz': { before: mBe50, after: mAf50, delta: Number((mAf50 - mBe50).toFixed(1)) },
+          '100Hz': { before: mBe100, after: mAf100, delta: Number((mAf100 - mBe100).toFixed(1)) }
+        }
+      };
+    }
+
+    results['ALL'] = groupData;
   }
 
   return results;

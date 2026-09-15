@@ -11,13 +11,20 @@ import {
   RefreshCw,
   Layers,
   Database,
-  Info
+  Info,
+  Download,
+  FileCheck
 } from 'lucide-react';
 
 import ProtocolBView from './components/ProtocolBView';
 import PublicationBarChart from './components/PublicationBarChart';
 import { parseMicrocirculationWorkbook, parseMyotonWorkbook, COMPASS_POINTS } from './utils/excelParser';
 import { mean, std } from './utils/statistics';
+import {
+  downloadMicrocirculationTemplate,
+  downloadMyotonTemplate,
+  downloadUnifiedTemplate
+} from './utils/templateGenerator';
 
 export default function App() {
   const [activeTab, setActiveTab] = useState('protocol_b'); // 'protocol_b' is primary
@@ -147,7 +154,7 @@ export default function App() {
                     Microcirculation & Myoton Research
                   </h1>
                   <span className="text-[10px] font-semibold tracking-wide bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full">
-                    v2.0 WebApp
+                    v2.2.0 Desktop & Web
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 hidden sm:block">
@@ -328,6 +335,105 @@ export default function App() {
                         className="hidden"
                       />
                     </label>
+                  </div>
+                </div>
+
+                {/* Standardized Excel Template Download Card */}
+                <div className="bg-linear-to-br from-indigo-900 to-slate-900 rounded-2xl p-6 text-white shadow-md border border-indigo-800/50">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-indigo-700/50">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <FileSpreadsheet className="w-5 h-5 text-indigo-300" />
+                        <h3 className="text-base font-bold text-white">
+                          Format Template Excel Standar (Siap Pakai untuk Analisis Baru)
+                        </h3>
+                        <span className="text-[10px] bg-indigo-500/30 text-indigo-200 border border-indigo-400/40 px-2 py-0.5 rounded-full font-semibold">
+                          Single / Multi-Subjek Bebas
+                        </span>
+                      </div>
+                      <p className="text-xs text-indigo-200 mt-1 max-w-2xl">
+                        Unduh template dataset baku untuk eksperimen baru Anda. Cukup isi nilai rekaman alat Anda ke dalam template ini, lalu upload kembali ke aplikasi untuk analisis otomatis.
+                      </p>
+                    </div>
+
+                    {/* Quick All-in-One Download */}
+                    <button
+                      onClick={downloadUnifiedTemplate}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-900/30 shrink-0 cursor-pointer"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Unduh Paket Lengkap (Unified .xlsx)</span>
+                    </button>
+                  </div>
+
+                  {/* 3 Download Options */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-5">
+                    {/* 1. SBF Template */}
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex flex-col justify-between hover:bg-white/10 transition-colors">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Activity className="w-4 h-4 text-cyan-400" />
+                          <h4 className="text-xs font-bold text-slate-100">Template SBF Microcirculation</h4>
+                        </div>
+                        <p className="text-[11px] text-slate-300 leading-relaxed mb-3">
+                          12 kolom per subjek (3 frekuensi x 2 fase Before/After x 2 channel optik). Default 40 Hz (~2670 baris per fase).
+                        </p>
+                        <div className="text-[10px] font-mono text-indigo-300 bg-indigo-950/60 p-2 rounded border border-indigo-800/40 mb-4">
+                          Kolom: [Subjek] &gt; 1_30, 1_50, 1_100 &gt; before/after &gt; Ch1/Ch2
+                        </div>
+                      </div>
+                      <button
+                        onClick={downloadMicrocirculationTemplate}
+                        className="w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold transition-all shadow-xs cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Unduh SBF Template (.xlsx)</span>
+                      </button>
+                    </div>
+
+                    {/* 2. Myoton Template */}
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex flex-col justify-between hover:bg-white/10 transition-colors">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <Compass className="w-4 h-4 text-amber-400" />
+                          <h4 className="text-xs font-bold text-slate-100">Template Myoton 9-Titik Grid</h4>
+                        </div>
+                        <p className="text-[11px] text-slate-300 leading-relaxed mb-3">
+                          Format urutan ular kompas: 1 NW, 2 N, 3 NE, 4 W, 5 C, 6 E, 7 SW, 8 S, 9 SE. Kolom frekuensi 30, 50, 100Hz + T1 & M1.
+                        </p>
+                        <div className="text-[10px] font-mono text-amber-300 bg-amber-950/60 p-2 rounded border border-amber-800/40 mb-4">
+                          Grid 3x3: NW -&gt; N -&gt; NE -&gt; W -&gt; C -&gt; E -&gt; SW -&gt; S -&gt; SE
+                        </div>
+                      </div>
+                      <button
+                        onClick={downloadMyotonTemplate}
+                        className="w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-semibold transition-all shadow-xs cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5" />
+                        <span>Unduh Myoton Template (.xlsx)</span>
+                      </button>
+                    </div>
+
+                    {/* 3. Guide & Rules */}
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex flex-col justify-between hover:bg-white/10 transition-colors">
+                      <div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <FileCheck className="w-4 h-4 text-emerald-400" />
+                          <h4 className="text-xs font-bold text-slate-100">Fleksibilitas Jumlah Subjek</h4>
+                        </div>
+                        <p className="text-[11px] text-slate-300 leading-relaxed mb-3">
+                          Aplikasi mendukung:
+                        </p>
+                        <ul className="text-[11px] text-slate-300 space-y-1.5 list-disc list-inside mb-4">
+                          <li><strong>Single Subjek:</strong> 1 orang subjek saja.</li>
+                          <li><strong>Multi-Subjek:</strong> Bebas tambah subjek baru di kolom berikutnya.</li>
+                          <li><strong>Analisis Bersamaan:</strong> Mode "🌐 Semua Subjek (Group Pooled)" merata-ratakan seluruh subjek.</li>
+                        </ul>
+                      </div>
+                      <div className="p-2 rounded bg-emerald-950/60 border border-emerald-800/40 text-[10px] text-emerald-200">
+                        ✓ Lembar instruksi lengkap disertakan di dalam file Excel.
+                      </div>
+                    </div>
                   </div>
                 </div>
 

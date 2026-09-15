@@ -1,6 +1,6 @@
 {
   "name": "microcirculation-suite",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Microcirculation (SBF) & Myoton Multimodal Analytics Suite",
   "author": "Richard / AU Lab",
   "main": "electron/main.cjs",

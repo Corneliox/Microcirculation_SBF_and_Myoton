@@ -18,9 +18,15 @@ import {
 import CompassHeatmap from './CompassHeatmap';
 import { segmentMicrocirculationSignal, computeMultimodalGridResults, COMPASS_POINTS } from '../utils/excelParser';
 
+import { downloadMicrocirculationTemplate, downloadMyotonTemplate, downloadUnifiedTemplate } from '../utils/templateGenerator';
+import { mean } from '../utils/statistics';
+
 export default function ProtocolBView({ microData, myotonData }) {
-  // Configurable Parameters
-  const [selectedSubjectId, setSelectedSubjectId] = useState(1); // 1 = Bas, 2 = Cornel, 3 = Reuben
+  // Discovered subject names from uploaded or auto-loaded data
+  const subjectList = useMemo(() => (microData ? Object.keys(microData) : []), [microData]);
+
+  // Configurable Parameters ('ALL' for group pooled, or individual subject name)
+  const [selectedSubjectKey, setSelectedSubjectKey] = useState('ALL');
   const [selectedFreq, setSelectedFreq] = useState('30Hz'); // '30Hz', '50Hz', '100Hz'
 
   // User revised inputs:
@@ -34,55 +40,111 @@ export default function ProtocolBView({ microData, myotonData }) {
   const [pythonError, setPythonError] = useState(null);
   const isElectron = typeof window !== 'undefined' && !!window.electronAPI?.isElectron;
 
-  // Compute 9-point dwells and correlations
+  // Compute 9-point dwells and correlations (Single Subject OR Group Average)
   const analysisResult = useMemo(() => {
-    if (!microData || !myotonData) return null;
+    if (!microData || !myotonData || subjectList.length === 0) return null;
 
-    // Subject mapping
-    const subjectNames = { 1: 'Bas', 2: 'Cornel', 3: 'Reuben' };
-    const sName = subjectNames[selectedSubjectId] || 'Bas';
-    const subjMicro = microData[sName];
-    const subjMyoton = myotonData[selectedSubjectId];
+    const isGroup = selectedSubjectKey === 'ALL';
 
-    if (!subjMicro || !subjMyoton) return null;
+    if (isGroup) {
+      // Group Average Mode: average dwells across all subjects
+      const allDwellsBe = [];
+      const allDwellsAf = [];
 
-    const beSamples = subjMicro.frequencies[selectedFreq]?.before || [];
-    const afSamples = subjMicro.frequencies[selectedFreq]?.after || [];
+      subjectList.forEach((sName) => {
+        const sMicro = microData[sName];
+        if (sMicro && sMicro.frequencies[selectedFreq]) {
+          const be = sMicro.frequencies[selectedFreq].before || [];
+          const af = sMicro.frequencies[selectedFreq].after || [];
+          allDwellsBe.push(segmentMicrocirculationSignal(be, samplingRateHz, dwellDurationSec, dwellEstimator));
+          allDwellsAf.push(segmentMicrocirculationSignal(af, samplingRateHz, dwellDurationSec, dwellEstimator));
+        }
+      });
 
-    const dwellsBefore = segmentMicrocirculationSignal(beSamples, samplingRateHz, dwellDurationSec, dwellEstimator);
-    const dwellsAfter = segmentMicrocirculationSignal(afSamples, samplingRateHz, dwellDurationSec, dwellEstimator);
+      if (allDwellsBe.length === 0) return null;
 
-    const multimodal = computeMultimodalGridResults(dwellsBefore, dwellsAfter, subjMyoton.points, selectedFreq);
+      // Average 9 dwells across subjects
+      const groupDwellsBe = [];
+      const groupDwellsAf = [];
 
-    return {
-      subjectName: sName,
-      dwellsBefore,
-      dwellsAfter,
-      ...multimodal
-    };
-  }, [microData, myotonData, selectedSubjectId, selectedFreq, samplingRateHz, dwellDurationSec, dwellEstimator]);
+      for (let i = 0; i < 9; i++) {
+        const cp = COMPASS_POINTS[i];
+        const beVals = allDwellsBe.map((dw) => (dw[i] ? dw[i].value : 0)).filter((v) => v > 0);
+        const afVals = allDwellsAf.map((dw) => (dw[i] ? dw[i].value : 0)).filter((v) => v > 0);
 
-  if (!analysisResult) {
-    return (
-      <div className="p-12 text-center bg-white rounded-xl border border-gray-200">
-        <Activity className="w-8 h-8 text-gray-400 mx-auto mb-2 animate-pulse" />
-        <p className="text-gray-600 font-medium">Memuat dan menganalisis dataset real multimodal...</p>
-      </div>
-    );
-  }
+        const mBe = beVals.length > 0 ? Number(mean(beVals).toFixed(2)) : 0;
+        const mAf = afVals.length > 0 ? Number(mean(afVals).toFixed(2)) : 0;
+
+        groupDwellsBe.push({
+          dwellIndex: i + 1,
+          compassName: cp.name,
+          compassCode: cp.code,
+          gridRow: cp.row,
+          gridCol: cp.col,
+          value: mBe
+        });
+        groupDwellsAf.push({
+          dwellIndex: i + 1,
+          compassName: cp.name,
+          compassCode: cp.code,
+          gridRow: cp.row,
+          gridCol: cp.col,
+          value: mAf
+        });
+      }
+
+      // Myoton points for group average
+      const groupMyoton = myotonData['ALL'] || myotonData[1] || Object.values(myotonData)[0];
+      const multimodal = computeMultimodalGridResults(groupDwellsBe, groupDwellsAf, groupMyoton.points, selectedFreq);
+
+      return {
+        subjectName: `Semua Subjek (Group Pooled, N = ${subjectList.length})`,
+        isGroup: true,
+        subjectCount: subjectList.length,
+        dwellsBefore: groupDwellsBe,
+        dwellsAfter: groupDwellsAf,
+        ...multimodal
+      };
+    } else {
+      // Single Subject Mode
+      const sName = selectedSubjectKey;
+      const subjMicro = microData[sName];
+      // Lookup Myoton by name, or by numeric index
+      const sIdx = subjectList.indexOf(sName);
+      const subjMyoton = myotonData[sName] || myotonData[sIdx + 1] || Object.values(myotonData)[0];
+
+      if (!subjMicro || !subjMyoton) return null;
+
+      const beSamples = subjMicro.frequencies[selectedFreq]?.before || [];
+      const afSamples = subjMicro.frequencies[selectedFreq]?.after || [];
+
+      const dwellsBefore = segmentMicrocirculationSignal(beSamples, samplingRateHz, dwellDurationSec, dwellEstimator);
+      const dwellsAfter = segmentMicrocirculationSignal(afSamples, samplingRateHz, dwellDurationSec, dwellEstimator);
+
+      const multimodal = computeMultimodalGridResults(dwellsBefore, dwellsAfter, subjMyoton.points, selectedFreq);
+
+      return {
+        subjectName: sName,
+        isGroup: false,
+        subjectCount: 1,
+        dwellsBefore,
+        dwellsAfter,
+        ...multimodal
+      };
+    }
+  }, [microData, myotonData, subjectList, selectedSubjectKey, selectedFreq, samplingRateHz, dwellDurationSec, dwellEstimator]);
 
   const handleRunPythonBackend = async () => {
     if (!window.electronAPI?.runPythonAnalysis) return;
     setIsPythonRunning(true);
     setPythonError(null);
     try {
-      const subjectNames = { 1: 'Bas', 2: 'Cornel', 3: 'Reuben' };
-      const sName = subjectNames[selectedSubjectId] || 'Bas';
+      const subjectToAnalyze = selectedSubjectKey === 'ALL' ? 'Bas' : selectedSubjectKey;
       const res = await window.electronAPI.runPythonAnalysis({
         task: 'protocol_b_grid',
         microFile: 'Example/Input_Real_ICha/microcirculation-data.xlsx',
         myotonFile: 'Example/Input_Real_ICha/OCT_Myoton(R_R)(2).xlsx',
-        subject: sName,
+        subject: subjectToAnalyze,
         freq: selectedFreq,
         fs: samplingRateHz,
         dwellDuration: dwellDurationSec,
@@ -97,8 +159,8 @@ export default function ProtocolBView({ microData, myotonData }) {
     }
   };
 
-  const rho = analysisResult.correlations.deltaSpearman;
-  const pearsonR = analysisResult.correlations.deltaPearson;
+  const rho = analysisResult?.correlations?.deltaSpearman ?? 0;
+  const pearsonR = analysisResult?.correlations?.deltaPearson ?? 0;
 
   return (
     <div className="space-y-6">
@@ -119,7 +181,19 @@ export default function ProtocolBView({ microData, myotonData }) {
             </div>
           </div>
           
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {/* Download Template Buttons */}
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={downloadUnifiedTemplate}
+                title="Unduh Format Standar Excel Gabungan (SBF & Myoton)"
+                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold transition-all shadow-2xs"
+              >
+                <Download className="w-3.5 h-3.5" />
+                <span>Template Excel Standar</span>
+              </button>
+            </div>
+
             {isElectron ? (
               <button
                 onClick={handleRunPythonBackend}
@@ -175,17 +249,29 @@ export default function ProtocolBView({ microData, myotonData }) {
 
         {/* Inputs Grid */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 text-xs">
-          {/* Subject Selector */}
+          {/* Subject Selector (Single vs Group Pooled) */}
           <div>
-            <label className="block text-gray-700 font-semibold mb-1">Subjek Pasien</label>
+            <label className="block text-gray-700 font-semibold mb-1">
+              Subjek Pasien
+              <span className="text-[10px] text-indigo-600 font-bold ml-1">
+                ({selectedSubjectKey === 'ALL' ? 'Group Mode' : 'Single Mode'})
+              </span>
+            </label>
             <select
-              value={selectedSubjectId}
-              onChange={(e) => setSelectedSubjectId(Number(e.target.value))}
+              value={selectedSubjectKey}
+              onChange={(e) => setSelectedSubjectKey(e.target.value)}
               className="w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg p-2 font-medium focus:ring-indigo-500 focus:border-indigo-500"
             >
-              <option value={1}>Subject 1 (Bas)</option>
-              <option value={2}>Subject 2 (Cornel)</option>
-              <option value={3}>Subject 3 (Reuben)</option>
+              {subjectList.length > 1 && (
+                <option value="ALL">
+                  🌐 Semua Subjek Bersamaan (N = {subjectList.length})
+                </option>
+              )}
+              {subjectList.map((sName, sIdx) => (
+                <option key={sName} value={sName}>
+                  Subjek {sIdx + 1}: {sName}
+                </option>
+              ))}
             </select>
           </div>
 
