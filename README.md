@@ -1,8 +1,10 @@
 # 🔬 Microcirculation (SBF) & Myotonometer Analysis Platform
 
+🌐 **Language:** **English** | [Bahasa Indonesia](README.id.md)
+
 [![Build Status](https://github.com/Corneliox/06_Microcirculation_SBF_and_Myoton/actions/workflows/build-exe.yml/badge.svg)](https://github.com/Corneliox/06_Microcirculation_SBF_and_Myoton/actions/workflows/build-exe.yml)
 [![Python Version](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-blue)](https://www.python.org/)
-[![GUI Framework](https://img.shields.io/badge/GUI-CustomTkinter%20v5.2-teal)](https://github.com/TomSchimansky/CustomTkinter)
+[![UI Framework](https://img.shields.io/badge/Desktop%20%26%20Web-React%2019%20%7C%20Electron-indigo)](https://react.dev/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 A high-performance biomedical signal processing and biomechanical analytics platform for studying **Skin Blood Flow (SBF)** microcirculation dynamics and **tissue stiffness** across multi-modal clinical protocols.
@@ -13,8 +15,8 @@ A high-performance biomedical signal processing and biomechanical analytics plat
 
 This research software integrates optical microcirculation measurements with mechanical tissue diagnostics:
 
-1. **Laser-Doppler Skin Blood Flow (SBF):** Continuous ~40 Hz perfusion flux recordings monitoring microvascular vasodilation and vasomotion in response to acoustic/electrical stimulation (50 Hz vs 100 Hz).
-2. **Myotonometer Plantar Tissue Biomechanics:** Spatial 9-point grid assessment of muscle/dermal mechanical properties (Oscillation Frequency $F$, Dynamic Stiffness $S$ [N/m], and Logarithmic Decrement $D$) across anatomical plantar coordinates (`[5, 2, 6, 8, 4, 3, 9, 7, 1]`).
+1. **Laser-Doppler Skin Blood Flow (SBF):** Continuous ~40 Hz perfusion flux recordings monitoring microvascular vasodilation and vasomotion in response to acoustic/electrical stimulation (30 Hz, 50 Hz, 100 Hz).
+2. **Myotonometer Plantar Tissue Biomechanics:** Spatial 9-point grid assessment of muscle/dermal mechanical properties (Oscillation Frequency $F$, Dynamic Stiffness $S$ [N/m], and Logarithmic Decrement $D$) across anatomical plantar coordinates.
 3. **Statistical Robustness & Sensitivity Testing:** One-way repeated-measures ANOVA, effect sizes ($\eta^2$), paired Wilcoxon signed-rank / Student's t-tests, and Jackknife (leave-one-out) subject removal simulations.
 
 ---
@@ -22,21 +24,24 @@ This research software integrates optical microcirculation measurements with mec
 ## ✨ Features & Capabilities
 
 ### 🦶 Protocol B: Plantar & Tissue Multimodal Grid (Main Application Focus)
-* **Interactive React WebApp (`webapp/`):** Instant browser-based multimodal analytics with one-click real data loading.
+* **Interactive React WebApp (`webapp/`):** Instant browser-based and desktop (Electron) multimodal analytics with one-click real data loading.
+* **Integrated Interactive Workflow Manual:** In-app manual with step-by-step guidance on hardware setup, signal dwell extraction, and data formatting.
 * **9-Point Anatomical Compass Grid ("Snake" Sequence):**
-  1. **Barat Laut (NW)**: [Row 1, Col 1]
-  2. **Utara (N)**: [Row 1, Col 2]
-  3. **Timur Laut (NE)**: [Row 1, Col 3]
-  4. **Barat (W)**: [Row 2, Col 1]
-  5. **Tengah (C)**: [Row 2, Col 2]
-  6. **Timur (E)**: [Row 2, Col 3]
-  7. **Barat Daya (SW)**: [Row 3, Col 1]
-  8. **Selatan (S)**: [Row 3, Col 2]
-  9. **Tenggara (SE)**: [Row 3, Col 3]
+  1. **North-West (NW)**: [Row 1, Col 1] — Anterolateral Forefoot
+  2. **North (N)**: [Row 1, Col 2] — Anterior Metatarsal Pad
+  3. **North-East (NE)**: [Row 1, Col 3] — Anteromedial Hallux
+  4. **West (W)**: [Row 2, Col 1] — Lateral Midfoot Arch
+  5. **Center (C)**: [Row 2, Col 2] — Plantar Core / Center
+  6. **East (E)**: [Row 2, Col 3] — Medial Midfoot Arch
+  7. **South-West (SW)**: [Row 3, Col 1] — Posterolateral Heel
+  8. **South (S)**: [Row 3, Col 2] — Posterior Central Heel
+  9. **South-East (SE)**: [Row 3, Col 3] — Posteromedial Heel
 * **Sampling Rate & Dwell Configuration:**
   * Default sampling frequency: **40 Hz** (1 sample = 0.025 s / 25 ms).
   * Fully configurable sampling rate ($f_s$) and dwell separation window duration (seconds).
 * **Dual Spatial Heatmaps:** Side-by-side $3 \times 3$ interactive matrix of $\Delta\text{Flux}$ (PU) vs $\Delta\text{Stiffness}$ (N/m).
+* **Single & Multi-Subject Group Pooling:** Analyze single participants or pool all subjects simultaneously (`🌐 All Subjects Combined`).
+* **Standardized Excel Template Generator:** Download standard, publication-ready Excel workbooks for SBF, Myoton 9-point grid, or Unified datasets with 1 click.
 * **Spatial Concordance Metrics:** Automatic computation of Spearman rank correlation ($\rho$) and Pearson ($r$) between vascular perfusion and biomechanical stiffness.
 * **Artifact-Resistant Estimators:** Choice of 25th-percentile (P25) resting dwell plateau, Median, or Mean.
 

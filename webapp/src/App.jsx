@@ -13,11 +13,13 @@ import {
   Database,
   Info,
   Download,
-  FileCheck
+  FileCheck,
+  BookOpen
 } from 'lucide-react';
 
 import ProtocolBView from './components/ProtocolBView';
 import PublicationBarChart from './components/PublicationBarChart';
+import HelpGuideModal from './components/HelpGuideModal';
 import { parseMicrocirculationWorkbook, parseMyotonWorkbook, COMPASS_POINTS } from './utils/excelParser';
 import { mean, std } from './utils/statistics';
 import {
@@ -32,6 +34,7 @@ export default function App() {
   const [myotonData, setMyotonData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState(null);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   // Auto-fetch real datasets from /data/ on mount
   useEffect(() => {
@@ -44,7 +47,7 @@ export default function App() {
         const baseUrl = import.meta.env.BASE_URL || './';
         const cleanBase = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
         const resMicro = await fetch(`${cleanBase}data/microcirculation-data.xlsx`);
-        if (!resMicro.ok) throw new Error(`Gagal memuat microcirculation-data.xlsx (${resMicro.statusText})`);
+        if (!resMicro.ok) throw new Error(`Failed to load microcirculation-data.xlsx (${resMicro.statusText})`);
         const abMicro = await resMicro.arrayBuffer();
         const wbMicro = XLSX.read(abMicro, { type: 'array' });
         const parsedMicro = parseMicrocirculationWorkbook(wbMicro);
@@ -52,14 +55,14 @@ export default function App() {
 
         // 2. Fetch Myoton dataset
         const resMyo = await fetch(`${cleanBase}data/OCT_Myoton(R_R)(2).xlsx`);
-        if (!resMyo.ok) throw new Error(`Gagal memuat OCT_Myoton(R_R)(2).xlsx (${resMyo.statusText})`);
+        if (!resMyo.ok) throw new Error(`Failed to load OCT_Myoton(R_R)(2).xlsx (${resMyo.statusText})`);
         const abMyo = await resMyo.arrayBuffer();
         const wbMyo = XLSX.read(abMyo, { type: 'array' });
         const parsedMyo = parseMyotonWorkbook(wbMyo);
         setMyotonData(parsedMyo);
       } catch (err) {
         console.error('Error auto-loading datasets:', err);
-        setErrorMessage(err.message || 'Gagal memuat file Excel contoh');
+        setErrorMessage(err.message || 'Failed to load sample Excel files');
       } finally {
         setLoading(false);
       }
@@ -113,7 +116,7 @@ export default function App() {
         const parsed = parseMicrocirculationWorkbook(wb);
         setMicroData(parsed);
       } catch (err) {
-        alert('Gagal membaca file microcirculation: ' + err.message);
+        alert('Failed to read microcirculation file: ' + err.message);
       }
     };
     reader.readAsArrayBuffer(file);
@@ -131,7 +134,7 @@ export default function App() {
         const parsed = parseMyotonWorkbook(wb);
         setMyotonData(parsed);
       } catch (err) {
-        alert('Gagal membaca file myoton: ' + err.message);
+        alert('Failed to read Myoton file: ' + err.message);
       }
     };
     reader.readAsArrayBuffer(file);
@@ -139,8 +142,11 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
+      {/* Help Modal */}
+      <HelpGuideModal isOpen={isHelpOpen} onClose={() => setIsHelpOpen(false)} />
+
       {/* Top Header */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-xs">
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-2xs">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo and App Title */}
@@ -151,10 +157,10 @@ export default function App() {
               <div>
                 <div className="flex items-center gap-2">
                   <h1 className="text-base font-bold text-slate-900 leading-tight">
-                    Microcirculation & Myoton Research
+                    Microcirculation & Myotonometer Research
                   </h1>
                   <span className="text-[10px] font-semibold tracking-wide bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full">
-                    v2.2.0 Desktop & Web
+                    v2.3.0 Desktop & Web
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 hidden sm:block">
@@ -163,9 +169,9 @@ export default function App() {
               </div>
             </div>
 
-            {/* Live Data Status Indicator */}
-            <div className="flex items-center gap-3 text-xs">
-              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-md border border-slate-200">
+            {/* Live Data Status Indicator & Help Trigger */}
+            <div className="flex items-center gap-2 sm:gap-3 text-xs">
+              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-md border border-slate-200">
                 <span
                   className={`w-2 h-2 rounded-full ${
                     microData ? 'bg-emerald-500' : 'bg-amber-400 animate-pulse'
@@ -173,11 +179,11 @@ export default function App() {
                 />
                 <span className="font-medium text-slate-600">SBF:</span>
                 <span className="font-bold text-slate-800">
-                  {microData ? `${Object.keys(microData).length} Subjek` : 'Belum Dimuat'}
+                  {microData ? `${Object.keys(microData).length} Subjects` : 'Not Loaded'}
                 </span>
               </div>
 
-              <div className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-md border border-slate-200">
+              <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-md border border-slate-200">
                 <span
                   className={`w-2 h-2 rounded-full ${
                     myotonData ? 'bg-emerald-500' : 'bg-amber-400 animate-pulse'
@@ -185,54 +191,63 @@ export default function App() {
                 />
                 <span className="font-medium text-slate-600">Myoton:</span>
                 <span className="font-bold text-slate-800">
-                  {myotonData ? '9-Point Grid OK' : 'Belum Dimuat'}
+                  {myotonData ? '9-Point Grid OK' : 'Not Loaded'}
                 </span>
               </div>
+
+              {/* Help & Workflow Guide Button */}
+              <button
+                onClick={() => setIsHelpOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span>Workflow Guide</span>
+              </button>
             </div>
           </div>
 
           {/* Navigation Tabs */}
-          <div className="flex space-x-1 border-t border-slate-100 pt-1 -mb-px">
+          <div className="flex space-x-1 border-t border-slate-100 pt-1 -mb-px overflow-x-auto">
             {/* Tab 1: Protocol B (Main Menu) */}
             <button
               onClick={() => setActiveTab('protocol_b')}
-              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors shrink-0 cursor-pointer ${
                 activeTab === 'protocol_b'
                   ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50 rounded-t-lg'
                   : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
               }`}
             >
               <Compass className="w-4 h-4" />
-              <span>Protokol B: Plantar & Tissue Grid</span>
+              <span>Protocol B: Plantar & Tissue Grid</span>
               <span className="ml-1 text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 py-0.5 rounded-sm">
-                Utama
+                Primary
               </span>
             </button>
 
             {/* Tab 2: Publication Statistics (ANOVA & Paired t-test) */}
             <button
               onClick={() => setActiveTab('statistics')}
-              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors shrink-0 cursor-pointer ${
                 activeTab === 'statistics'
                   ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50 rounded-t-lg'
                   : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
               }`}
             >
               <BarChart3 className="w-4 h-4" />
-              <span>Statistik Publikasi (ANOVA & Paired t-test)</span>
+              <span>Publication Statistics (ANOVA & Paired t-test)</span>
             </button>
 
             {/* Tab 3: Dataset Inspector */}
             <button
               onClick={() => setActiveTab('data_inspector')}
-              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors ${
+              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors shrink-0 cursor-pointer ${
                 activeTab === 'data_inspector'
                   ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50 rounded-t-lg'
                   : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
               }`}
             >
               <FileSpreadsheet className="w-4 h-4" />
-              <span>Inspektor & Upload Dataset</span>
+              <span>Dataset Inspector & Upload</span>
             </button>
           </div>
         </div>
@@ -243,20 +258,20 @@ export default function App() {
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 bg-white rounded-2xl border border-slate-200 shadow-xs">
             <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin mb-3" />
-            <p className="text-sm font-semibold text-slate-700">Memuat Dataset Real Microcirculation & Myoton...</p>
-            <p className="text-xs text-slate-400 mt-1">Mengurai file Excel dari public/data/ (40 Hz default)...</p>
+            <p className="text-sm font-semibold text-slate-700">Loading Multimodal Microcirculation & Myoton Datasets...</p>
+            <p className="text-xs text-slate-400 mt-1">Parsing Excel workbooks from public/data/ (40 Hz default)...</p>
           </div>
         ) : errorMessage ? (
           <div className="p-6 bg-rose-50 border border-rose-200 rounded-xl text-rose-800 flex items-start gap-3">
             <AlertCircle className="w-5 h-5 mt-0.5 shrink-0" />
             <div>
-              <h3 className="text-sm font-bold">Terjadi Kesalahan Memuat Data</h3>
+              <h3 className="text-sm font-bold">Error Loading Datasets</h3>
               <p className="text-xs mt-1">{errorMessage}</p>
               <button
                 onClick={() => window.location.reload()}
-                className="mt-3 px-3 py-1.5 bg-rose-600 text-white rounded-md text-xs font-medium hover:bg-rose-700"
+                className="mt-3 px-3 py-1.5 bg-rose-600 text-white rounded-md text-xs font-medium hover:bg-rose-700 cursor-pointer"
               >
-                Muat Ulang Halaman
+                Reload Page
               </button>
             </div>
           </div>
@@ -264,7 +279,11 @@ export default function App() {
           <>
             {/* TAB 1: PROTOCOL B VIEW */}
             {activeTab === 'protocol_b' && (
-              <ProtocolBView microData={microData} myotonData={myotonData} />
+              <ProtocolBView
+                microData={microData}
+                myotonData={myotonData}
+                onOpenHelp={() => setIsHelpOpen(true)}
+              />
             )}
 
             {/* TAB 2: PUBLICATION STATISTICAL BAR CHART */}
@@ -285,19 +304,19 @@ export default function App() {
                       </div>
                       <div>
                         <h3 className="text-sm font-bold text-slate-900">
-                          Microcirculation Data (.xlsx)
+                          Microcirculation SBF Data (.xlsx)
                         </h3>
                         <p className="text-xs text-slate-500">
-                          Format multi-kolom horizontal (30Hz, 50Hz, 100Hz Before & After)
+                          Multi-column horizontal block format (30Hz, 50Hz, 100Hz Before & After)
                         </p>
                       </div>
                     </div>
                     <p className="text-xs text-slate-600 mb-4 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                      <strong>File aktif:</strong> <code>microcirculation-data.xlsx</code> (Subjek: Bas, Cornel, Reuben). Laju sampling default 40 Hz (25 ms per sampel).
+                      <strong>Active file:</strong> <code>microcirculation-data.xlsx</code> (Subjects: Bas, Cornel, Reuben). Default sampling rate: 40 Hz (25 ms per sample).
                     </p>
                     <label className="flex items-center justify-center gap-2 w-full p-3 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-indigo-500 hover:bg-indigo-50/20 transition-all text-xs font-semibold text-slate-700">
                       <Upload className="w-4 h-4 text-slate-500" />
-                      <span>Upload File SBF Pengganti</span>
+                      <span>Upload Custom SBF File (.xlsx)</span>
                       <input
                         type="file"
                         accept=".xlsx, .xls"
@@ -315,19 +334,19 @@ export default function App() {
                       </div>
                       <div>
                         <h3 className="text-sm font-bold text-slate-900">
-                          OCT Myoton 9-Point Data (.xlsx)
+                          OCT Myoton 9-Point Grid (.xlsx)
                         </h3>
                         <p className="text-xs text-slate-500">
-                          Format matriks 9 titik kompas (Barat Laut s/d Tenggara)
+                          Raster 9 compass coordinates (North-West through South-East)
                         </p>
                       </div>
                     </div>
                     <p className="text-xs text-slate-600 mb-4 bg-slate-50 p-2.5 rounded-lg border border-slate-100">
-                      <strong>File aktif:</strong> <code>OCT_Myoton(R_R)(2).xlsx</code>. Berisi titik 1 sampai 9 dengan frekuensi 30, 50, 100Hz + T1 & M1.
+                      <strong>Active file:</strong> <code>OCT_Myoton(R_R)(2).xlsx</code>. Contains points 1 to 9 with frequencies 30, 50, 100Hz + T1 & M1.
                     </p>
                     <label className="flex items-center justify-center gap-2 w-full p-3 border-2 border-dashed border-slate-300 rounded-lg cursor-pointer hover:border-indigo-500 hover:bg-indigo-50/20 transition-all text-xs font-semibold text-slate-700">
                       <Upload className="w-4 h-4 text-slate-500" />
-                      <span>Upload File Myoton Pengganti</span>
+                      <span>Upload Custom Myoton File (.xlsx)</span>
                       <input
                         type="file"
                         accept=".xlsx, .xls"
@@ -345,14 +364,14 @@ export default function App() {
                       <div className="flex items-center gap-2">
                         <FileSpreadsheet className="w-5 h-5 text-indigo-300" />
                         <h3 className="text-base font-bold text-white">
-                          Format Template Excel Standar (Siap Pakai untuk Analisis Baru)
+                          Standardized Excel Dataset Templates (Ready-to-Use for New Research)
                         </h3>
                         <span className="text-[10px] bg-indigo-500/30 text-indigo-200 border border-indigo-400/40 px-2 py-0.5 rounded-full font-semibold">
-                          Single / Multi-Subjek Bebas
+                          Single / Multi-Subject Flexible
                         </span>
                       </div>
                       <p className="text-xs text-indigo-200 mt-1 max-w-2xl">
-                        Unduh template dataset baku untuk eksperimen baru Anda. Cukup isi nilai rekaman alat Anda ke dalam template ini, lalu upload kembali ke aplikasi untuk analisis otomatis.
+                        Download standardized templates configured for your experiments. Enter your raw data into these spreadsheets and upload them back to the application for automated analysis.
                       </p>
                     </div>
 
@@ -362,7 +381,7 @@ export default function App() {
                       className="flex items-center gap-2 px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-md shadow-emerald-900/30 shrink-0 cursor-pointer"
                     >
                       <Download className="w-4 h-4" />
-                      <span>Unduh Paket Lengkap (Unified .xlsx)</span>
+                      <span>Download Unified Template (.xlsx)</span>
                     </button>
                   </div>
 
@@ -373,13 +392,13 @@ export default function App() {
                       <div>
                         <div className="flex items-center gap-2 mb-2">
                           <Activity className="w-4 h-4 text-cyan-400" />
-                          <h4 className="text-xs font-bold text-slate-100">Template SBF Microcirculation</h4>
+                          <h4 className="text-xs font-bold text-slate-100">Microcirculation SBF Template</h4>
                         </div>
                         <p className="text-[11px] text-slate-300 leading-relaxed mb-3">
-                          12 kolom per subjek (3 frekuensi x 2 fase Before/After x 2 channel optik). Default 40 Hz (~2670 baris per fase).
+                          12 columns per subject (3 frequencies x 2 phases Before/After x 2 optical channels). Default 40 Hz (~2670 rows per phase).
                         </p>
                         <div className="text-[10px] font-mono text-indigo-300 bg-indigo-950/60 p-2 rounded border border-indigo-800/40 mb-4">
-                          Kolom: [Subjek] &gt; 1_30, 1_50, 1_100 &gt; before/after &gt; Ch1/Ch2
+                          Columns: [Subject] &gt; 1_30, 1_50, 1_100 &gt; before/after &gt; Ch1/Ch2
                         </div>
                       </div>
                       <button
@@ -387,7 +406,7 @@ export default function App() {
                         className="w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-lg text-xs font-semibold transition-all shadow-xs cursor-pointer"
                       >
                         <Download className="w-3.5 h-3.5" />
-                        <span>Unduh SBF Template (.xlsx)</span>
+                        <span>Download SBF Template (.xlsx)</span>
                       </button>
                     </div>
 
@@ -396,13 +415,13 @@ export default function App() {
                       <div>
                         <div className="flex items-center gap-2 mb-2">
                           <Compass className="w-4 h-4 text-amber-400" />
-                          <h4 className="text-xs font-bold text-slate-100">Template Myoton 9-Titik Grid</h4>
+                          <h4 className="text-xs font-bold text-slate-100">Myoton 9-Point Grid Template</h4>
                         </div>
                         <p className="text-[11px] text-slate-300 leading-relaxed mb-3">
-                          Format urutan ular kompas: 1 NW, 2 N, 3 NE, 4 W, 5 C, 6 E, 7 SW, 8 S, 9 SE. Kolom frekuensi 30, 50, 100Hz + T1 & M1.
+                          Raster snake compass order: 1 NW, 2 N, 3 NE, 4 W, 5 C, 6 E, 7 SW, 8 S, 9 SE. Frequency columns 30, 50, 100Hz + T1 & M1.
                         </p>
                         <div className="text-[10px] font-mono text-amber-300 bg-amber-950/60 p-2 rounded border border-amber-800/40 mb-4">
-                          Grid 3x3: NW -&gt; N -&gt; NE -&gt; W -&gt; C -&gt; E -&gt; SW -&gt; S -&gt; SE
+                          3x3 Grid: NW -&gt; N -&gt; NE -&gt; W -&gt; C -&gt; E -&gt; SW -&gt; S -&gt; SE
                         </div>
                       </div>
                       <button
@@ -410,28 +429,28 @@ export default function App() {
                         className="w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-semibold transition-all shadow-xs cursor-pointer"
                       >
                         <Download className="w-3.5 h-3.5" />
-                        <span>Unduh Myoton Template (.xlsx)</span>
+                        <span>Download Myoton Template (.xlsx)</span>
                       </button>
                     </div>
 
-                    {/* 3. Guide & Rules */}
+                    {/* 3. Subject Count Flexibility */}
                     <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex flex-col justify-between hover:bg-white/10 transition-colors">
                       <div>
                         <div className="flex items-center gap-2 mb-2">
                           <FileCheck className="w-4 h-4 text-emerald-400" />
-                          <h4 className="text-xs font-bold text-slate-100">Fleksibilitas Jumlah Subjek</h4>
+                          <h4 className="text-xs font-bold text-slate-100">Subject Count Flexibility</h4>
                         </div>
                         <p className="text-[11px] text-slate-300 leading-relaxed mb-3">
-                          Aplikasi mendukung:
+                          The platform supports:
                         </p>
                         <ul className="text-[11px] text-slate-300 space-y-1.5 list-disc list-inside mb-4">
-                          <li><strong>Single Subjek:</strong> 1 orang subjek saja.</li>
-                          <li><strong>Multi-Subjek:</strong> Bebas tambah subjek baru di kolom berikutnya.</li>
-                          <li><strong>Analisis Bersamaan:</strong> Mode "🌐 Semua Subjek (Group Pooled)" merata-ratakan seluruh subjek.</li>
+                          <li><strong>Single Subject:</strong> Analyze 1 participant individually.</li>
+                          <li><strong>Multi-Subject:</strong> Add extra subjects in subsequent columns.</li>
+                          <li><strong>Group Pooled:</strong> Ensemble averaging across all participants simultaneously.</li>
                         </ul>
                       </div>
                       <div className="p-2 rounded bg-emerald-950/60 border border-emerald-800/40 text-[10px] text-emerald-200">
-                        ✓ Lembar instruksi lengkap disertakan di dalam file Excel.
+                        &#10003; Full documentation and guides included in the Excel files.
                       </div>
                     </div>
                   </div>
@@ -442,7 +461,7 @@ export default function App() {
                   <div className="flex items-center gap-2 mb-4">
                     <Compass className="w-5 h-5 text-indigo-600" />
                     <h3 className="text-sm font-bold text-slate-900">
-                      Konfigurasi Orientasi Kompas 9 Titik ("Seperti Ular")
+                      9-Point Compass Orientation Configuration ("Snake" Grid)
                     </h3>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
@@ -457,7 +476,7 @@ export default function App() {
                           </span>
                           <div>
                             <p className="font-semibold text-slate-800">{cp.name}</p>
-                            <p className="text-[11px] text-slate-500">Matriks Baris {cp.row + 1}, Kolom {cp.col + 1}</p>
+                            <p className="text-[11px] text-slate-500">Matrix Row {cp.row + 1}, Column {cp.col + 1}</p>
                           </div>
                         </div>
                         <span className="font-mono font-bold text-slate-600 bg-white px-2 py-0.5 rounded border border-slate-200">
@@ -471,17 +490,17 @@ export default function App() {
                 {/* Subject Summary Table */}
                 <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs">
                   <h3 className="text-sm font-bold text-slate-900 mb-3">
-                    Ringkasan Subjek Terdeteksi di Dataset
+                    Detected Subjects Summary in Dataset
                   </h3>
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs text-left">
                       <thead className="bg-slate-50 text-slate-600 uppercase text-[10px] tracking-wider border-b border-slate-200">
                         <tr>
-                          <th className="py-2.5 px-3">Subjek</th>
-                          <th className="py-2.5 px-3">Frekuensi SBF</th>
-                          <th className="py-2.5 px-3">Jumlah Sampel / Freq</th>
-                          <th className="py-2.5 px-3">Durasi Total (detik @ 40Hz)</th>
-                          <th className="py-2.5 px-3">Status Titik Myoton</th>
+                          <th className="py-2.5 px-3">Subject</th>
+                          <th className="py-2.5 px-3">SBF Frequencies</th>
+                          <th className="py-2.5 px-3">Samples / Frequency</th>
+                          <th className="py-2.5 px-3">Total Duration (s @ 40Hz)</th>
+                          <th className="py-2.5 px-3">Myoton Grid Status</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -498,16 +517,16 @@ export default function App() {
                                   {sName} (ID: {sIdx + 1})
                                 </td>
                                 <td className="py-2.5 px-3 text-slate-600">30Hz, 50Hz, 100Hz</td>
-                                <td className="py-2.5 px-3 font-mono text-slate-700">{nSamples} per fase</td>
+                                <td className="py-2.5 px-3 font-mono text-slate-700">{nSamples} per phase</td>
                                 <td className="py-2.5 px-3 font-mono text-slate-700">~{dur} s</td>
                                 <td className="py-2.5 px-3">
                                   {myoSubj ? (
                                     <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[11px] font-medium border border-emerald-200">
-                                      <CheckCircle2 className="w-3.5 h-3.5" /> 9 Titik Lengkap
+                                      <CheckCircle2 className="w-3.5 h-3.5" /> 9 Points Complete
                                     </span>
                                   ) : (
                                     <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded text-[11px]">
-                                      Tidak Ada Data Myoton
+                                      No Myoton Data
                                     </span>
                                   )}
                                 </td>
@@ -533,4 +552,3 @@ export default function App() {
     </div>
   );
 }
-

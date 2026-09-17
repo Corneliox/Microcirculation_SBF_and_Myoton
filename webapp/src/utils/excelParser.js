@@ -19,15 +19,15 @@ import * as XLSX from 'xlsx';
 import { calculateDwellValue, mean, std, pairedTTest, oneWayAnova, spearmanCorrelation, pearsonCorrelation } from './statistics';
 
 export const COMPASS_POINTS = [
-  { id: 1, name: 'Barat Laut (NW)', code: 'NW', row: 0, col: 0 },
-  { id: 2, name: 'Utara (N)', code: 'N', row: 0, col: 1 },
-  { id: 3, name: 'Timur Laut (NE)', code: 'NE', row: 0, col: 2 },
-  { id: 4, name: 'Barat (W)', code: 'W', row: 1, col: 0 },
-  { id: 5, name: 'Tengah (C)', code: 'C', row: 1, col: 1 },
-  { id: 6, name: 'Timur (E)', code: 'E', row: 1, col: 2 },
-  { id: 7, name: 'Barat Daya (SW)', code: 'SW', row: 2, col: 0 },
-  { id: 8, name: 'Selatan (S)', code: 'S', row: 2, col: 1 },
-  { id: 9, name: 'Tenggara (SE)', code: 'SE', row: 2, col: 2 }
+  { id: 1, name: 'North-West (NW)', code: 'NW', row: 0, col: 0 },
+  { id: 2, name: 'North (N)', code: 'N', row: 0, col: 1 },
+  { id: 3, name: 'North-East (NE)', code: 'NE', row: 0, col: 2 },
+  { id: 4, name: 'West (W)', code: 'W', row: 1, col: 0 },
+  { id: 5, name: 'Center (C)', code: 'C', row: 1, col: 1 },
+  { id: 6, name: 'East (E)', code: 'E', row: 1, col: 2 },
+  { id: 7, name: 'South-West (SW)', code: 'SW', row: 2, col: 0 },
+  { id: 8, name: 'South (S)', code: 'S', row: 2, col: 1 },
+  { id: 9, name: 'South-East (SE)', code: 'SE', row: 2, col: 2 }
 ];
 
 /**
@@ -40,7 +40,7 @@ export function parseMicrocirculationWorkbook(workbook) {
   const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
   if (!rawData || rawData.length < 4) {
-    throw new Error('Format lembar kerja SBF tidak valid (terlalu sedikit baris)');
+    throw new Error('Invalid SBF worksheet format (insufficient rows)');
   }
 
   // 1. Detect Subject Header Row (Search rows 0, 1, 2)

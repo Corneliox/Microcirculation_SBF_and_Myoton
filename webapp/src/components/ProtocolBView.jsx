@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+﻿import React, { useState, useMemo } from 'react';
 import {
   Compass,
   Sliders,
@@ -13,15 +13,15 @@ import {
   RotateCcw,
   Cpu,
   Terminal,
-  Play
+  Play,
+  BookOpen
 } from 'lucide-react';
 import CompassHeatmap from './CompassHeatmap';
 import { segmentMicrocirculationSignal, computeMultimodalGridResults, COMPASS_POINTS } from '../utils/excelParser';
-
 import { downloadMicrocirculationTemplate, downloadMyotonTemplate, downloadUnifiedTemplate } from '../utils/templateGenerator';
 import { mean } from '../utils/statistics';
 
-export default function ProtocolBView({ microData, myotonData }) {
+export default function ProtocolBView({ microData, myotonData, onOpenHelp }) {
   // Discovered subject names from uploaded or auto-loaded data
   const subjectList = useMemo(() => (microData ? Object.keys(microData) : []), [microData]);
 
@@ -98,7 +98,7 @@ export default function ProtocolBView({ microData, myotonData }) {
       const multimodal = computeMultimodalGridResults(groupDwellsBe, groupDwellsAf, groupMyoton.points, selectedFreq);
 
       return {
-        subjectName: `Semua Subjek (Group Pooled, N = ${subjectList.length})`,
+        subjectName: `All Subjects (Group Pooled, N = ${subjectList.length})`,
         isGroup: true,
         subjectCount: subjectList.length,
         dwellsBefore: groupDwellsBe,
@@ -173,39 +173,49 @@ export default function ProtocolBView({ microData, myotonData }) {
             </div>
             <div>
               <h2 className="font-bold text-gray-900 text-base">
-                Protokol B: Plantar 9-Point Multimodal Spatial Grid
+                Protocol B: Plantar 9-Point Multimodal Spatial Grid
               </h2>
               <p className="text-xs text-gray-500">
-                Pencocokan spasial Laser-Doppler Flux & Kekakuan Jaringan Myotonometer (Layout Kompas 3×3)
+                Spatial co-registration of Laser-Doppler Flux & Myotonometer Tissue Stiffness (3×3 Compass Grid)
               </p>
             </div>
           </div>
           
           <div className="flex flex-wrap items-center gap-2">
-            {/* Download Template Buttons */}
-            <div className="flex items-center gap-1.5">
+            {/* Help / Manual Trigger Button */}
+            {onOpenHelp && (
               <button
-                onClick={downloadUnifiedTemplate}
-                title="Unduh Format Standar Excel Gabungan (SBF & Myoton)"
-                className="flex items-center gap-1.5 px-2.5 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold transition-all shadow-2xs"
+                onClick={onOpenHelp}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border border-indigo-200 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+                title="Open full workflow and experimental protocol guide"
               >
-                <Download className="w-3.5 h-3.5" />
-                <span>Template Excel Standar</span>
+                <BookOpen className="w-3.5 h-3.5 text-indigo-600" />
+                <span>Workflow Manual</span>
               </button>
-            </div>
+            )}
+
+            {/* Download Template Button */}
+            <button
+              onClick={downloadUnifiedTemplate}
+              title="Download Standard Excel Template (SBF & Myoton)"
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-xs font-semibold transition-all shadow-2xs cursor-pointer"
+            >
+              <Download className="w-3.5 h-3.5 text-slate-600" />
+              <span>Standard Excel Templates</span>
+            </button>
 
             {isElectron ? (
               <button
                 onClick={handleRunPythonBackend}
                 disabled={isPythonRunning}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-xs transition-all disabled:opacity-50"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-semibold shadow-xs transition-all disabled:opacity-50 cursor-pointer"
               >
                 {isPythonRunning ? (
                   <RotateCcw className="w-3.5 h-3.5 animate-spin" />
                 ) : (
                   <Cpu className="w-3.5 h-3.5 text-emerald-400" />
                 )}
-                <span>{isPythonRunning ? 'Menjalankan Python...' : 'Run Python Backend (IPC)'}</span>
+                <span>{isPythonRunning ? 'Running Python...' : 'Run Python Backend (IPC)'}</span>
               </button>
             ) : (
               <span className="text-[11px] font-semibold px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg flex items-center gap-1.5">
@@ -252,7 +262,7 @@ export default function ProtocolBView({ microData, myotonData }) {
           {/* Subject Selector (Single vs Group Pooled) */}
           <div>
             <label className="block text-gray-700 font-semibold mb-1">
-              Subjek Pasien
+              Subject / Participant
               <span className="text-[10px] text-indigo-600 font-bold ml-1">
                 ({selectedSubjectKey === 'ALL' ? 'Group Mode' : 'Single Mode'})
               </span>
@@ -260,16 +270,16 @@ export default function ProtocolBView({ microData, myotonData }) {
             <select
               value={selectedSubjectKey}
               onChange={(e) => setSelectedSubjectKey(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg p-2 font-medium focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg p-2 font-medium focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer"
             >
               {subjectList.length > 1 && (
                 <option value="ALL">
-                  🌐 Semua Subjek Bersamaan (N = {subjectList.length})
+                  🌐 All Subjects Combined (Group Pooled, N = {subjectList.length})
                 </option>
               )}
               {subjectList.map((sName, sIdx) => (
                 <option key={sName} value={sName}>
-                  Subjek {sIdx + 1}: {sName}
+                  Subject {sIdx + 1}: {sName}
                 </option>
               ))}
             </select>
@@ -277,11 +287,11 @@ export default function ProtocolBView({ microData, myotonData }) {
 
           {/* Frequency Selector */}
           <div>
-            <label className="block text-gray-700 font-semibold mb-1">Frekuensi Stimulasi</label>
+            <label className="block text-gray-700 font-semibold mb-1">Stimulation Frequency</label>
             <select
               value={selectedFreq}
               onChange={(e) => setSelectedFreq(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg p-2 font-medium focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg p-2 font-medium focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer"
             >
               <option value="30Hz">30 Hz (1_30)</option>
               <option value="50Hz">50 Hz (1_50)</option>
@@ -289,7 +299,7 @@ export default function ProtocolBView({ microData, myotonData }) {
             </select>
           </div>
 
-          {/* Sampling Rate Input (User Revision: default 40Hz = 25ms) */}
+          {/* Sampling Rate Input (default 40Hz = 25ms) */}
           <div>
             <label className="block text-gray-700 font-semibold mb-1">
               Sampling Rate (Hz)
@@ -308,12 +318,12 @@ export default function ProtocolBView({ microData, myotonData }) {
             />
           </div>
 
-          {/* Dwell Separation Input (User Revision: Pisahkan data per detik) */}
+          {/* Dwell Separation Input */}
           <div>
             <label className="block text-gray-700 font-semibold mb-1">
-              Pisah Data Per (detik)
+              Dwell Window (s)
               <span className="text-[10px] text-gray-400 font-normal ml-1">
-                ({Math.round(dwellDurationSec * samplingRateHz)} sampel)
+                ({Math.round(dwellDurationSec * samplingRateHz)} samples)
               </span>
             </label>
             <input
@@ -329,15 +339,15 @@ export default function ProtocolBView({ microData, myotonData }) {
 
           {/* Estimator Method */}
           <div>
-            <label className="block text-gray-700 font-semibold mb-1">Estimator Jendela Dwell</label>
+            <label className="block text-gray-700 font-semibold mb-1">Dwell Plateau Estimator</label>
             <select
               value={dwellEstimator}
               onChange={(e) => setDwellEstimator(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg p-2 font-medium focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full bg-gray-50 border border-gray-300 text-gray-900 rounded-lg p-2 font-medium focus:ring-indigo-500 focus:border-indigo-500 cursor-pointer"
             >
-              <option value="p25">P25 (Plateau - Tahan Spike)</option>
+              <option value="p25">P25 (Plateau - Spike Resistant)</option>
               <option value="median">Median (P50)</option>
-              <option value="mean">Mean Rata-Rata</option>
+              <option value="mean">Mean (Arithmetic Average)</option>
             </select>
           </div>
         </div>
@@ -346,17 +356,17 @@ export default function ProtocolBView({ microData, myotonData }) {
       {/* Spatial Concordance & Summary Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Concordance Metric Card */}
-        <div className="bg-gradient-to-br from-indigo-900 to-indigo-950 text-white rounded-xl p-5 shadow-sm flex flex-col justify-between">
+        <div className="bg-linear-to-br from-indigo-900 to-indigo-950 text-white rounded-xl p-5 shadow-xs flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
               <span className="text-xs uppercase tracking-wider font-semibold text-indigo-300">
-                Konkordansi Spasial
+                Spatial Concordance
               </span>
               <Compass className="w-4 h-4 text-indigo-300" />
             </div>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-3xl font-black">{rho >= 0 ? `+${rho.toFixed(2)}` : rho.toFixed(2)}</span>
-              <span className="text-xs text-indigo-200">Spearman ρ</span>
+              <span className="text-xs text-indigo-200">Spearman &rho;</span>
             </div>
             <div className="text-xs text-indigo-300 mt-1">
               Pearson r = {pearsonR >= 0 ? `+${pearsonR.toFixed(2)}` : pearsonR.toFixed(2)}
@@ -366,12 +376,12 @@ export default function ProtocolBView({ microData, myotonData }) {
             {rho < 0 ? (
               <span className="flex items-center gap-1 text-emerald-300 font-semibold">
                 <TrendingDown className="w-3.5 h-3.5" />
-                Korelasi Negatif: Vasodilatasi beriringan dengan penurunan kekakuan jaringan.
+                Negative Correlation: Vasodilation coincides with reduced tissue stiffness (biomechanical softening).
               </span>
             ) : (
               <span className="flex items-center gap-1 text-amber-300 font-semibold">
                 <TrendingUp className="w-3.5 h-3.5" />
-                Korelasi Positif: Kenaikan fluks sejalan dengan peningkatan tegangan jaringan.
+                Positive Correlation: Perfusion elevation coincides with increased tissue tension.
               </span>
             )}
           </div>
@@ -381,13 +391,13 @@ export default function ProtocolBView({ microData, myotonData }) {
         <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-xs flex flex-col justify-between">
           <div>
             <span className="text-xs uppercase tracking-wider font-semibold text-gray-500">
-              Rata-Rata Fluks Mikrosirkulasi
+              Mean Microcirculation Flux
             </span>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-2xl font-black text-rose-600">
                 {analysisResult.means.fluxDeltaMean >= 0 ? `+${analysisResult.means.fluxDeltaMean}` : analysisResult.means.fluxDeltaMean}
               </span>
-              <span className="text-xs text-gray-500">PU (Δ Rata-Rata)</span>
+              <span className="text-xs text-gray-500">PU (Mean &Delta;)</span>
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between text-xs text-gray-600">
@@ -400,13 +410,13 @@ export default function ProtocolBView({ microData, myotonData }) {
         <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-xs flex flex-col justify-between">
           <div>
             <span className="text-xs uppercase tracking-wider font-semibold text-gray-500">
-              Rata-Rata Kekakuan Myoton
+              Mean Myoton Tissue Stiffness
             </span>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="text-2xl font-black text-amber-600">
                 {analysisResult.means.stiffDeltaMean >= 0 ? `+${analysisResult.means.stiffDeltaMean}` : analysisResult.means.stiffDeltaMean}
               </span>
-              <span className="text-xs text-gray-500">N/m (Δ Rata-Rata)</span>
+              <span className="text-xs text-gray-500">N/m (Mean &Delta;)</span>
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between text-xs text-gray-600">
@@ -419,8 +429,8 @@ export default function ProtocolBView({ microData, myotonData }) {
       {/* Dual Side-by-Side 3x3 Compass Heatmaps */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <CompassHeatmap
-          title="Δ Laser-Doppler Blood Flow"
-          subtitle="Perubahan perfusi mikrosirkulasi per titik kompas (After − Before)"
+          title="&Delta; Laser-Doppler Blood Flow"
+          subtitle="Microvascular perfusion change per compass site (After - Before)"
           metricName="Flux"
           unit="PU"
           dataCells={analysisResult.cells}
@@ -428,8 +438,8 @@ export default function ProtocolBView({ microData, myotonData }) {
         />
 
         <CompassHeatmap
-          title="Δ Myoton Tissue Stiffness"
-          subtitle="Perubahan kekakuan dinamis biomekanika per titik kompas (After − Before)"
+          title="&Delta; Myoton Tissue Stiffness"
+          subtitle="Biomechanical dynamic stiffness change per compass site (After - Before)"
           metricName="Stiffness"
           unit="N/m"
           dataCells={analysisResult.cells}
@@ -442,10 +452,10 @@ export default function ProtocolBView({ microData, myotonData }) {
         <div className="p-4 bg-gray-50 border-b border-gray-200 flex items-center justify-between">
           <div>
             <h3 className="font-bold text-gray-900 text-sm">
-              Rekap Data 9 Titik Arah Kompas (Sesuai Konvensi 1–9)
+              9-Point Compass Spatial Measurements Table (Sites 1-9)
             </h3>
             <p className="text-xs text-gray-500">
-              1: Barat Laut | 2: Utara | 3: Timur Laut | 4: Barat | 5: Tengah | 6: Timur | 7: Barat Daya | 8: Selatan | 9: Tenggara
+              1: North-West | 2: North | 3: North-East | 4: West | 5: Center | 6: East | 7: South-West | 8: South | 9: South-East
             </p>
           </div>
         </div>
@@ -454,16 +464,16 @@ export default function ProtocolBView({ microData, myotonData }) {
           <table className="w-full text-xs text-left">
             <thead className="bg-gray-100 text-gray-700 font-semibold border-b">
               <tr>
-                <th className="py-2.5 px-4">Titik (#)</th>
-                <th className="py-2.5 px-4">Arah Kompas</th>
+                <th className="py-2.5 px-4">Site (#)</th>
+                <th className="py-2.5 px-4">Compass Direction</th>
                 <th className="py-2.5 px-4 text-right">Flux Before (PU)</th>
                 <th className="py-2.5 px-4 text-right">Flux After (PU)</th>
-                <th className="py-2.5 px-4 text-right font-bold">Δ Flux (PU)</th>
-                <th className="py-2.5 px-4 text-right">Flux Δ %</th>
+                <th className="py-2.5 px-4 text-right font-bold">&Delta; Flux (PU)</th>
+                <th className="py-2.5 px-4 text-right">Flux &Delta; %</th>
                 <th className="py-2.5 px-4 text-right">Stiff Before (N/m)</th>
                 <th className="py-2.5 px-4 text-right">Stiff After (N/m)</th>
-                <th className="py-2.5 px-4 text-right font-bold">Δ Stiff (N/m)</th>
-                <th className="py-2.5 px-4 text-right">Stiff Δ %</th>
+                <th className="py-2.5 px-4 text-right font-bold">&Delta; Stiff (N/m)</th>
+                <th className="py-2.5 px-4 text-right">Stiff &Delta; %</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">

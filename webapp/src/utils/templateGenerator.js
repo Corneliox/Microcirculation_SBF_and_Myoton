@@ -10,7 +10,7 @@ import { COMPASS_POINTS } from './excelParser';
 /**
  * Creates standardized Microcirculation SBF workbook with sample data and instructions
  */
-export function createMicrocirculationWorkbook(subjectNames = ['Subjek_A', 'Subjek_B']) {
+export function createMicrocirculationWorkbook(subjectNames = ['Subject_A', 'Subject_B']) {
   const wb = XLSX.utils.book_new();
 
   // 1. Sheet Data: SBF_Signal_Data
@@ -58,31 +58,31 @@ export function createMicrocirculationWorkbook(subjectNames = ['Subjek_A', 'Subj
   const wsData = XLSX.utils.aoa_to_sheet(allRows);
   XLSX.utils.book_append_sheet(wb, wsData, 'SBF_Signal_Data');
 
-  // 2. Sheet Panduan / Instructions
+  // 2. Guide Sheet / Instructions
   const guideRows = [
-    ['PANDUAN FORMAT DATASET STANDAR MICROCIRCULATION (SBF)'],
+    ['STANDARDIZED MICROCIRCULATION (SBF) DATASET FORMAT GUIDE'],
     ['========================================================='],
-    ['1. Struktur Kolom per Subjek (12 Kolom per Subjek):'],
-    ['   - Kolom 1-4: Frekuensi 30 Hz (Channel 1-2 Before, Channel 1-2 After)'],
-    ['   - Kolom 5-8: Frekuensi 50 Hz (Channel 1-2 Before, Channel 1-2 After)'],
-    ['   - Kolom 9-12: Frekuensi 100 Hz (Channel 1-2 Before, Channel 1-2 After)'],
+    ['1. Column Structure per Subject (12 Columns per Subject):'],
+    ['   - Columns 1-4: Frequency 30 Hz (Channel 1-2 Before, Channel 1-2 After)'],
+    ['   - Columns 5-8: Frequency 50 Hz (Channel 1-2 Before, Channel 1-2 After)'],
+    ['   - Columns 9-12: Frequency 100 Hz (Channel 1-2 Before, Channel 1-2 After)'],
     [''],
-    ['2. Parameter Sinyal:'],
-    ['   - Laju Sampling Default: 40 Hz (1 data = 0.025 detik / 25 milidetik).'],
-    ['   - Jumlah Baris Standar: ~2670 baris per fase (~66.8 detik total pencatatan).'],
-    ['   - Baris 1: Nama Subjek (Cukup isi di kolom awal tiap blok 12 kolom).'],
-    ['   - Baris 2: Frekuensi (1_30, 1_50, 1_100).'],
-    ['   - Baris 3: Fase stimulasi (before, after).'],
-    ['   - Baris 4: Saluran optik (Channel 1, Channel 2).'],
-    ['   - Baris 5+: Nilai numerik Perfusion Units (PU).'],
+    ['2. Signal Parameters:'],
+    ['   - Default Sampling Frequency: 40 Hz (1 sample = 0.025 seconds / 25 milliseconds).'],
+    ['   - Standard Sample Count: ~2670 rows per phase (~66.8 seconds total recording).'],
+    ['   - Row 1: Subject Name (Fill in the first column of each 12-column block).'],
+    ['   - Row 2: Frequency Codes (1_30, 1_50, 1_100).'],
+    ['   - Row 3: Stimulation Phase (before, after).'],
+    ['   - Row 4: Optical Channel (Channel 1, Channel 2).'],
+    ['   - Row 5+: Numeric Perfusion Units (PU).'],
     [''],
-    ['3. Menambah Subjek (Single atau Banyak Subjek Bersamaan):'],
-    ['   - Untuk 1 subjek saja: Gunakan kolom A sampai L (12 kolom pertama).'],
-    ['   - Untuk banyak subjek: Tambahkan blok 12 kolom berikutnya di sebelah kanan (kolom M, dst).'],
-    ['   - Aplikasi otomatis mendeteksi jumlah subjek secara dinamis tanpa batas maksimal!']
+    ['3. Adding Subjects (Single or Multiple Subjects Simultaneously):'],
+    ['   - For 1 subject only: Use columns A through L (first 12 columns).'],
+    ['   - For multiple subjects: Append subsequent 12-column blocks to the right (columns M, Y, etc.).'],
+    ['   - The platform dynamically detects unlimited subjects and supports group-pooled ensemble analysis!']
   ];
   const wsGuide = XLSX.utils.aoa_to_sheet(guideRows);
-  XLSX.utils.book_append_sheet(wb, wsGuide, 'Panduan_Format');
+  XLSX.utils.book_append_sheet(wb, wsGuide, 'Format_Guide');
 
   return wb;
 }
@@ -90,7 +90,7 @@ export function createMicrocirculationWorkbook(subjectNames = ['Subjek_A', 'Subj
 /**
  * Creates standardized Myoton 9-Point Compass Grid workbook
  */
-export function createMyotonWorkbook(subjectNames = ['Subject 1 (Subjek_A)', 'Subject 2 (Subjek_B)']) {
+export function createMyotonWorkbook(subjectNames = ['Subject 1 (Subject_A)', 'Subject 2 (Subject_B)']) {
   const wb = XLSX.utils.book_new();
 
   const headerRow0 = ['', '', '', '', '', '', '', '', '', 'T1', '', 'M1', ''];
@@ -132,25 +132,25 @@ export function createMyotonWorkbook(subjectNames = ['Subject 1 (Subjek_A)', 'Su
   const wsData = XLSX.utils.aoa_to_sheet(allRows);
   XLSX.utils.book_append_sheet(wb, wsData, 'myoton');
 
-  // Panduan Orientasi Kompas Ular (Snake Order)
+  // Compass Snake Grid Guide
   const guideRows = [
-    ['PANDUAN ORIENTASI GRID KOMPAS 9 TITIK MYOTONOMETER ("SEPERTI ULAR")'],
+    ['MYOTONOMETER 9-POINT COMPASS GRID GUIDE ("SNAKE" RASTER SEQUENCE)'],
     ['========================================================================'],
-    ['Urutan Baris 1 s/d 9 untuk Tiap Subjek:'],
-    ['  1. Barat Laut (NW) -> Koordinat Matriks Baris 1, Kolom 1 (Kiri Atas)'],
-    ['  2. Utara (N)       -> Koordinat Matriks Baris 1, Kolom 2 (Tengah Atas)'],
-    ['  3. Timur Laut (NE) -> Koordinat Matriks Baris 1, Kolom 3 (Kanan Atas)'],
-    ['  4. Barat (W)       -> Koordinat Matriks Baris 2, Kolom 1 (Kiri Tengah)'],
-    ['  5. Tengah (C)      -> Koordinat Matriks Baris 2, Kolom 2 (Pusat Grid)'],
-    ['  6. Timur (E)       -> Koordinat Matriks Baris 2, Kolom 3 (Kanan Tengah)'],
-    ['  7. Barat Daya (SW) -> Koordinat Matriks Baris 3, Kolom 1 (Kiri Bawah)'],
-    ['  8. Selatan (S)     -> Koordinat Matriks Baris 3, Kolom 2 (Tengah Bawah)'],
-    ['  9. Tenggara (SE)   -> Koordinat Matriks Baris 3, Kolom 3 (Kanan Bawah)'],
+    ['Row Sequence 1 through 9 for Each Subject:'],
+    ['  1. North-West (NW) -> Matrix Row 1, Column 1 (Top-Left)'],
+    ['  2. North (N)       -> Matrix Row 1, Column 2 (Top-Center)'],
+    ['  3. North-East (NE) -> Matrix Row 1, Column 3 (Top-Right)'],
+    ['  4. West (W)        -> Matrix Row 2, Column 1 (Center-Left)'],
+    ['  5. Center (C)      -> Matrix Row 2, Column 2 (Grid Center)'],
+    ['  6. East (E)        -> Matrix Row 2, Column 3 (Center-Right)'],
+    ['  7. South-West (SW) -> Matrix Row 3, Column 1 (Bottom-Left)'],
+    ['  8. South (S)       -> Matrix Row 3, Column 2 (Bottom-Center)'],
+    ['  9. South-East (SE) -> Matrix Row 3, Column 3 (Bottom-Right)'],
     [''],
-    ['Satuan Nilai: Dynamic Stiffness (N/m). Parameter opsional: T1 dan M1.']
+    ['Metric Unit: Dynamic Stiffness (N/m). Optional parameters: T1 and M1.']
   ];
   const wsGuide = XLSX.utils.aoa_to_sheet(guideRows);
-  XLSX.utils.book_append_sheet(wb, wsGuide, 'Panduan_Grid_Kompas');
+  XLSX.utils.book_append_sheet(wb, wsGuide, 'Compass_Grid_Guide');
 
   return wb;
 }
@@ -158,14 +158,14 @@ export function createMyotonWorkbook(subjectNames = ['Subject 1 (Subjek_A)', 'Su
 /**
  * Creates a unified workbook containing BOTH Microcirculation and Myoton sheets
  */
-export function createUnifiedWorkbook(subjectNames = ['Subjek_A', 'Subjek_B']) {
+export function createUnifiedWorkbook(subjectNames = ['Subject_A', 'Subject_B']) {
   const wbMicro = createMicrocirculationWorkbook(subjectNames);
-  const wbMyo = createMyotonWorkbook(subjectNames.map((n, i) => `Subject ${i + 1} (${n})`));
+  const wbMyo = createMyotonWorkbook(subjectNames.map((n, i) => Subject  ()));
 
   const wbUnified = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wbUnified, wbMicro.Sheets['SBF_Signal_Data'], 'Microcirculation_SBF');
   XLSX.utils.book_append_sheet(wbUnified, wbMyo.Sheets['myoton'], 'OCT_Myoton_9Point');
-  XLSX.utils.book_append_sheet(wbUnified, wbMicro.Sheets['Panduan_Format'], 'Panduan_Penggunaan');
+  XLSX.utils.book_append_sheet(wbUnified, wbMicro.Sheets['Format_Guide'], 'User_Guide');
 
   return wbUnified;
 }
@@ -173,7 +173,7 @@ export function createUnifiedWorkbook(subjectNames = ['Subjek_A', 'Subjek_B']) {
 /**
  * Triggers client-side browser file download for an XLSX workbook
  */
-export function downloadWorkbook(workbook, filename = 'Template_Dataset.xlsx') {
+export function downloadWorkbook(workbook, filename = 'Standard_Dataset_Template.xlsx') {
   const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
   const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
   const url = URL.createObjectURL(blob);
@@ -189,16 +189,16 @@ export function downloadWorkbook(workbook, filename = 'Template_Dataset.xlsx') {
 }
 
 export function downloadMicrocirculationTemplate() {
-  const wb = createMicrocirculationWorkbook(['Subjek_1', 'Subjek_2', 'Subjek_3']);
-  downloadWorkbook(wb, 'Format_Template_Microcirculation_SBF.xlsx');
+  const wb = createMicrocirculationWorkbook(['Subject_1', 'Subject_2', 'Subject_3']);
+  downloadWorkbook(wb, 'Standard_Microcirculation_SBF_Template.xlsx');
 }
 
 export function downloadMyotonTemplate() {
-  const wb = createMyotonWorkbook(['Subject 1 (Subjek_1)', 'Subject 2 (Subjek_2)', 'Subject 3 (Subjek_3)']);
-  downloadWorkbook(wb, 'Format_Template_Myoton_9Point_Grid.xlsx');
+  const wb = createMyotonWorkbook(['Subject 1 (Subject_1)', 'Subject 2 (Subject_2)', 'Subject 3 (Subject_3)']);
+  downloadWorkbook(wb, 'Standard_Myoton_9Point_Grid_Template.xlsx');
 }
 
 export function downloadUnifiedTemplate() {
-  const wb = createUnifiedWorkbook(['Subjek_1', 'Subjek_2', 'Subjek_3']);
-  downloadWorkbook(wb, 'Format_Template_Unified_SBF_and_Myoton.xlsx');
+  const wb = createUnifiedWorkbook(['Subject_1', 'Subject_2', 'Subject_3']);
+  downloadWorkbook(wb, 'Standard_Unified_SBF_and_Myoton_Template.xlsx');
 }
