@@ -41,6 +41,10 @@ This research software integrates optical microcirculation measurements with mec
   * Fully configurable sampling rate ($f_s$) and dwell separation window duration (seconds).
 * **Dual Spatial Heatmaps:** Side-by-side $3 \times 3$ interactive matrix of $\Delta\text{Flux}$ (PU) vs $\Delta\text{Stiffness}$ (N/m).
 * **Single & Multi-Subject Group Pooling:** Analyze single participants or pool all subjects simultaneously (`🌐 All Subjects Combined`).
+* **Standalone Modality Analysis Tabs (v2.4.0):**
+  * **SBF Standalone Tab:** Process Laser-Doppler perfusion signals alone (9 dwell kinetics, plateau estimators, % vasodilation) without requiring Myoton data.
+  * **Myoton Standalone Tab:** Process tissue biomechanics alone (9-point spatial matrix, dynamic stiffness $S$, $T_1$, $M_1$, % softening) without requiring SBF data.
+* **Fast Python Backend IPC (<1s):** Direct in-memory JSON stream evaluation avoiding redundant disk I/O for instantaneous numerical validation.
 * **Standardized Excel Template Generator:** Download standard, publication-ready Excel workbooks for SBF, Myoton 9-point grid, or Unified datasets with 1 click.
 * **Spatial Concordance Metrics:** Automatic computation of Spearman rank correlation ($\rho$) and Pearson ($r$) between vascular perfusion and biomechanical stiffness.
 * **Artifact-Resistant Estimators:** Choice of 25th-percentile (P25) resting dwell plateau, Median, or Mean.

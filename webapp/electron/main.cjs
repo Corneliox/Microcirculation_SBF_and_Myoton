@@ -1,4 +1,4 @@
-﻿const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 const path = require('path');
 const { spawn } = require('child_process');
 const fs = require('fs');
@@ -101,18 +101,25 @@ ipcMain.handle('run-python-analysis', async (event, params) => {
       args.push(scriptPath);
     }
 
-    args.push('--task', params.task || 'protocol_b_grid');
-    if (params.microFile) args.push('--micro-file', params.microFile);
-    if (params.myotonFile) args.push('--myoton-file', params.myotonFile);
-    if (params.subject) args.push('--subject', params.subject);
-    if (params.freq) args.push('--freq', params.freq);
-    if (params.fs) args.push('--fs', String(params.fs));
-    if (params.dwellDuration) args.push('--dwell-duration', String(params.dwellDuration));
-    if (params.estimator) args.push('--estimator', params.estimator);
+    if (params.payload) {
+      args.push('--task', 'fast_grid', '--stdin');
+    } else {
+      args.push('--task', params.task || 'protocol_b_grid');
+      if (params.microFile) args.push('--micro-file', params.microFile);
+      if (params.myotonFile) args.push('--myoton-file', params.myotonFile);
+      if (params.subject) args.push('--subject', params.subject);
+      if (params.freq) args.push('--freq', params.freq);
+      if (params.fs) args.push('--fs', String(params.fs));
+      if (params.dwellDuration) args.push('--dwell-duration', String(params.dwellDuration));
+      if (params.estimator) args.push('--estimator', params.estimator);
+    }
 
-    console.log('[Electron IPC] Spawning Python:', pythonExe, args.join(' '));
+    const workingDir = isDev ? path.join(__dirname, '../../') : process.resourcesPath;
+    console.log('[Electron IPC] Spawning Python in', workingDir, ':', pythonExe, args.join(' '));
 
+    const startTime = Date.now();
     const py = spawn(pythonExe, args, {
+      cwd: workingDir,
       windowsHide: true
     });
 
@@ -129,14 +136,20 @@ ipcMain.handle('run-python-analysis', async (event, params) => {
       stderrData += chunk.toString();
     });
 
+    if (params.payload) {
+      py.stdin.write(JSON.stringify(params.payload));
+      py.stdin.end();
+    }
+
     py.on('error', (err) => {
       activePythonProcess = null;
       console.error('[Electron IPC] Python Spawn Error:', err);
-      reject(new Error(`Gagal menjalankan Python backend: ${err.message}`));
+      reject(new Error(`Failed to execute Python backend: ${err.message}`));
     });
 
     py.on('close', (code) => {
       activePythonProcess = null;
+      const elapsedMs = Date.now() - startTime;
       if (code !== 0) {
         console.error('[Electron IPC] Python Exit Error Code:', code, stderrData);
         reject(new Error(`Python process exited with code ${code}: ${stderrData || stdoutData}`));
@@ -145,10 +158,11 @@ ipcMain.handle('run-python-analysis', async (event, params) => {
 
       try {
         const parsed = JSON.parse(stdoutData.trim());
+        parsed.executionTimeMs = elapsedMs;
         resolve(parsed);
       } catch (parseErr) {
         console.error('[Electron IPC] JSON Parse Error:', parseErr, stdoutData);
-        reject(new Error(`Gagal mengurai respons JSON dari Python backend: ${parseErr.message}`));
+        reject(new Error(`Failed to parse Python JSON output: ${parseErr.message}`));
       }
     });
   });

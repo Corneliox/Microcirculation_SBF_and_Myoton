@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Excel Template Generator for Microcirculation (SBF) and Myoton 9-Point Grid.
  * Enables one-click downloading of standardized, publication-grade Excel templates
  * that support single-subject or multi-subject batch analysis.
@@ -160,7 +160,7 @@ export function createMyotonWorkbook(subjectNames = ['Subject 1 (Subject_A)', 'S
  */
 export function createUnifiedWorkbook(subjectNames = ['Subject_A', 'Subject_B']) {
   const wbMicro = createMicrocirculationWorkbook(subjectNames);
-  const wbMyo = createMyotonWorkbook(subjectNames.map((n, i) => Subject  ()));
+  const wbMyo = createMyotonWorkbook(subjectNames.map((n, i) => `Subject ${i + 1} (${n})`));
 
   const wbUnified = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wbUnified, wbMicro.Sheets['SBF_Signal_Data'], 'Microcirculation_SBF');
@@ -174,18 +174,23 @@ export function createUnifiedWorkbook(subjectNames = ['Subject_A', 'Subject_B'])
  * Triggers client-side browser file download for an XLSX workbook
  */
 export function downloadWorkbook(workbook, filename = 'Standard_Dataset_Template.xlsx') {
-  const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-  const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => {
-    document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
-  }, 100);
+  try {
+    XLSX.writeFile(workbook, filename);
+  } catch (err) {
+    console.warn('XLSX.writeFile failed, using Blob fallback:', err);
+    const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => {
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    }, 100);
+  }
 }
 
 export function downloadMicrocirculationTemplate() {

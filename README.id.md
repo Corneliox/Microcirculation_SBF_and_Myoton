@@ -1,4 +1,4 @@
-﻿# 🔬 Platform Analisis Mikrosirkulasi (SBF) & Myotonometer
+# 🔬 Platform Analisis Mikrosirkulasi (SBF) & Myotonometer
 
 🌐 **Bahasa:** [English](README.md) | **Bahasa Indonesia**
 
@@ -42,6 +42,10 @@ Aplikasi riset ini mengintegrasikan pengukuran mikrosirkulasi optik dengan diagn
 * **Fleksibilitas Subjek:**
   * **Single Subjek:** Analisis per individu secara mendalam.
   * **Multi-Subjek / Group Pooled (`🌐 Semua Subjek Bersamaan`):** Menggabungkan dan merata-ratakan seluruh subjek secara simultan untuk analisis kelompok.
+* **Tab Analisis Mandiri / Terpisah (v2.4.0):**
+  * **Tab Mandiri SBF:** Analisis sinyal Laser-Doppler saja (9 kinetika dwell, perubahan vasodilatasi %) tanpa memerlukan data Myoton.
+  * **Tab Mandiri Myoton:** Analisis biomekanika jaringan saja (grid 3×3, kekakuan dinamis $S$, $T_1$, $M_1$) tanpa memerlukan data SBF.
+* **IPC Python Backend Super Cepat (<1 detik):** Evaluasi memori langsung lewat stream JSON menghindari pembacaan ulang file Excel besar dari disk.
 * **Estimator Jendela Dwell:** Pilihan P25 (persentil ke-25, tahan terhadap spike pergerakan probe), Median (P50), atau Mean aritmatika.
 
 ### 📊 Statistik Publikasi (ANOVA & Paired t-test)

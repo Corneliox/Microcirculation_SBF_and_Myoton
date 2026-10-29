@@ -1,4 +1,4 @@
-﻿import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Compass,
   Sliders,
@@ -6,6 +6,7 @@ import {
   Layers,
   FileSpreadsheet,
   Download,
+  Upload,
   CheckCircle,
   HelpCircle,
   TrendingDown,
@@ -21,7 +22,7 @@ import { segmentMicrocirculationSignal, computeMultimodalGridResults, COMPASS_PO
 import { downloadMicrocirculationTemplate, downloadMyotonTemplate, downloadUnifiedTemplate } from '../utils/templateGenerator';
 import { mean } from '../utils/statistics';
 
-export default function ProtocolBView({ microData, myotonData, onOpenHelp }) {
+export default function ProtocolBView({ microData, myotonData, onOpenHelp, onUploadMicro, onUploadMyoton }) {
   // Discovered subject names from uploaded or auto-loaded data
   const subjectList = useMemo(() => (microData ? Object.keys(microData) : []), [microData]);
 
@@ -139,16 +140,27 @@ export default function ProtocolBView({ microData, myotonData, onOpenHelp }) {
     setIsPythonRunning(true);
     setPythonError(null);
     try {
-      const subjectToAnalyze = selectedSubjectKey === 'ALL' ? 'Bas' : selectedSubjectKey;
-      const res = await window.electronAPI.runPythonAnalysis({
-        task: 'protocol_b_grid',
-        microFile: 'Example/Input_Real_ICha/microcirculation-data.xlsx',
-        myotonFile: 'Example/Input_Real_ICha/OCT_Myoton(R_R)(2).xlsx',
-        subject: subjectToAnalyze,
+      // Build in-memory fast payload directly from current analysis result
+      const payload = {
+        subject: selectedSubjectKey,
         freq: selectedFreq,
         fs: samplingRateHz,
         dwellDuration: dwellDurationSec,
-        estimator: dwellEstimator
+        estimator: dwellEstimator,
+        dwellsBefore: analysisResult?.dwellsBefore || [],
+        dwellsAfter: analysisResult?.dwellsAfter || [],
+        myotonPoints: analysisResult?.cells
+          ? analysisResult.cells.map((c) => ({
+              id: c.id,
+              stiffBefore: c.stiffBefore,
+              stiffAfter: c.stiffAfter
+            }))
+          : []
+      };
+
+      const res = await window.electronAPI.runPythonAnalysis({
+        task: 'fast_grid',
+        payload
       });
       setPythonResult(res);
     } catch (err) {
@@ -182,6 +194,33 @@ export default function ProtocolBView({ microData, myotonData, onOpenHelp }) {
           </div>
           
           <div className="flex flex-wrap items-center gap-2">
+            {/* Quick Upload Buttons for Microcirculation & Myoton */}
+            {onUploadMicro && (
+              <label className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-2xs">
+                <Upload className="w-3.5 h-3.5 text-blue-600" />
+                <span>Upload SBF</span>
+                <input
+                  type="file"
+                  accept=".xlsx, .xls"
+                  onChange={onUploadMicro}
+                  className="hidden"
+                />
+              </label>
+            )}
+
+            {onUploadMyoton && (
+              <label className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-2xs">
+                <Upload className="w-3.5 h-3.5 text-emerald-600" />
+                <span>Upload Myoton</span>
+                <input
+                  type="file"
+                  accept=".xlsx, .xls"
+                  onChange={onUploadMyoton}
+                  className="hidden"
+                />
+              </label>
+            )}
+
             {/* Help / Manual Trigger Button */}
             {onOpenHelp && (
               <button
@@ -194,15 +233,31 @@ export default function ProtocolBView({ microData, myotonData, onOpenHelp }) {
               </button>
             )}
 
-            {/* Download Template Button */}
-            <button
-              onClick={downloadUnifiedTemplate}
-              title="Download Standard Excel Template (SBF & Myoton)"
-              className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-xs font-semibold transition-all shadow-2xs cursor-pointer"
-            >
-              <Download className="w-3.5 h-3.5 text-slate-600" />
-              <span>Standard Excel Templates</span>
-            </button>
+            {/* Download Template Buttons Group */}
+            <div className="relative inline-flex items-center rounded-lg border border-slate-300 bg-white shadow-2xs">
+              <button
+                onClick={() => downloadUnifiedTemplate()}
+                title="Download Standard Unified Excel Template (SBF & Myoton Combined)"
+                className="flex items-center gap-1.5 px-3 py-1.5 hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all rounded-l-lg cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5 text-slate-600" />
+                <span>Unified Template</span>
+              </button>
+              <button
+                onClick={() => downloadMicrocirculationTemplate()}
+                title="Download SBF Template alone"
+                className="px-2 py-1.5 border-l border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-medium cursor-pointer"
+              >
+                SBF
+              </button>
+              <button
+                onClick={() => downloadMyotonTemplate()}
+                title="Download Myoton 9-Point Template alone"
+                className="px-2 py-1.5 border-l border-slate-200 hover:bg-slate-50 text-slate-600 text-xs font-medium rounded-r-lg cursor-pointer"
+              >
+                Myoton
+              </button>
+            </div>
 
             {isElectron ? (
               <button
@@ -215,7 +270,7 @@ export default function ProtocolBView({ microData, myotonData, onOpenHelp }) {
                 ) : (
                   <Cpu className="w-3.5 h-3.5 text-emerald-400" />
                 )}
-                <span>{isPythonRunning ? 'Running Python...' : 'Run Python Backend (IPC)'}</span>
+                <span>{isPythonRunning ? 'Running Python...' : 'Run Python Backend (Fast IPC)'}</span>
               </button>
             ) : (
               <span className="text-[11px] font-semibold px-2.5 py-1 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded-lg flex items-center gap-1.5">
@@ -239,7 +294,14 @@ export default function ProtocolBView({ microData, myotonData, onOpenHelp }) {
                 <CheckCircle className="w-4 h-4" />
               </div>
               <div>
-                <p className="font-bold">Python SciPy Core Execution Verified</p>
+                <p className="font-bold flex items-center gap-2">
+                  <span>Python SciPy Core Execution Verified</span>
+                  {pythonResult.executionTimeMs != null && (
+                    <span className="font-mono text-[10px] bg-emerald-200/90 text-emerald-950 px-2 py-0.5 rounded font-semibold border border-emerald-300">
+                      ⚡ {pythonResult.executionTimeMs} ms
+                    </span>
+                  )}
+                </p>
                 <p className="text-[11px] text-emerald-800">
                   Spearman &rho; = {pythonResult.correlations.deltaSpearman} (p = {pythonResult.correlations.deltaSpearmanPValue}), Pearson r = {pythonResult.correlations.deltaPearson} (p = {pythonResult.correlations.deltaPearsonPValue})
                 </p>

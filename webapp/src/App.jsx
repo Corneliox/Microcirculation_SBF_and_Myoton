@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 
 import ProtocolBView from './components/ProtocolBView';
+import SbfStandaloneView from './components/SbfStandaloneView';
+import MyotonStandaloneView from './components/MyotonStandaloneView';
 import PublicationBarChart from './components/PublicationBarChart';
 import HelpGuideModal from './components/HelpGuideModal';
 import { parseMicrocirculationWorkbook, parseMyotonWorkbook, COMPASS_POINTS } from './utils/excelParser';
@@ -160,7 +162,7 @@ export default function App() {
                     Microcirculation & Myotonometer Research
                   </h1>
                   <span className="text-[10px] font-semibold tracking-wide bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full">
-                    v2.3.0 Desktop & Web
+                    v2.4.0 Desktop & Web
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 hidden sm:block">
@@ -169,8 +171,9 @@ export default function App() {
               </div>
             </div>
 
-            {/* Live Data Status Indicator & Help Trigger */}
+            {/* Live Data Status Indicator & Quick Uploads */}
             <div className="flex items-center gap-2 sm:gap-3 text-xs">
+              {/* SBF Status & Quick Upload */}
               <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-md border border-slate-200">
                 <span
                   className={`w-2 h-2 rounded-full ${
@@ -181,8 +184,13 @@ export default function App() {
                 <span className="font-bold text-slate-800">
                   {microData ? `${Object.keys(microData).length} Subjects` : 'Not Loaded'}
                 </span>
+                <label className="ml-1 cursor-pointer text-indigo-600 hover:text-indigo-800 font-semibold text-[11px] hover:underline" title="Upload new SBF dataset">
+                  Upload
+                  <input type="file" accept=".xlsx, .xls" onChange={handleMicroUpload} className="hidden" />
+                </label>
               </div>
 
+              {/* Myoton Status & Quick Upload */}
               <div className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 rounded-md border border-slate-200">
                 <span
                   className={`w-2 h-2 rounded-full ${
@@ -193,6 +201,10 @@ export default function App() {
                 <span className="font-bold text-slate-800">
                   {myotonData ? '9-Point Grid OK' : 'Not Loaded'}
                 </span>
+                <label className="ml-1 cursor-pointer text-indigo-600 hover:text-indigo-800 font-semibold text-[11px] hover:underline" title="Upload new Myoton dataset">
+                  Upload
+                  <input type="file" accept=".xlsx, .xls" onChange={handleMyotonUpload} className="hidden" />
+                </label>
               </div>
 
               {/* Help & Workflow Guide Button */}
@@ -224,7 +236,33 @@ export default function App() {
               </span>
             </button>
 
-            {/* Tab 2: Publication Statistics (ANOVA & Paired t-test) */}
+            {/* Tab 2: SBF Microcirculation Standalone */}
+            <button
+              onClick={() => setActiveTab('sbf_standalone')}
+              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors shrink-0 cursor-pointer ${
+                activeTab === 'sbf_standalone'
+                  ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50 rounded-t-lg'
+                  : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
+              }`}
+            >
+              <Activity className="w-4 h-4 text-blue-600" />
+              <span>SBF Microcirculation (Standalone)</span>
+            </button>
+
+            {/* Tab 3: Myoton Standalone */}
+            <button
+              onClick={() => setActiveTab('myoton_standalone')}
+              className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors shrink-0 cursor-pointer ${
+                activeTab === 'myoton_standalone'
+                  ? 'border-indigo-600 text-indigo-600 bg-indigo-50/50 rounded-t-lg'
+                  : 'border-transparent text-slate-600 hover:text-slate-900 hover:border-slate-300'
+              }`}
+            >
+              <Layers className="w-4 h-4 text-emerald-600" />
+              <span>Myoton Biomechanics (Standalone)</span>
+            </button>
+
+            {/* Tab 4: Publication Statistics (ANOVA & Paired t-test) */}
             <button
               onClick={() => setActiveTab('statistics')}
               className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors shrink-0 cursor-pointer ${
@@ -237,7 +275,7 @@ export default function App() {
               <span>Publication Statistics (ANOVA & Paired t-test)</span>
             </button>
 
-            {/* Tab 3: Dataset Inspector */}
+            {/* Tab 5: Dataset Inspector & Templates */}
             <button
               onClick={() => setActiveTab('data_inspector')}
               className={`flex items-center gap-2 px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors shrink-0 cursor-pointer ${
@@ -247,7 +285,7 @@ export default function App() {
               }`}
             >
               <FileSpreadsheet className="w-4 h-4" />
-              <span>Dataset Inspector & Upload</span>
+              <span>Dataset & Templates</span>
             </button>
           </div>
         </div>
@@ -283,15 +321,33 @@ export default function App() {
                 microData={microData}
                 myotonData={myotonData}
                 onOpenHelp={() => setIsHelpOpen(true)}
+                onUploadMicro={handleMicroUpload}
+                onUploadMyoton={handleMyotonUpload}
               />
             )}
 
-            {/* TAB 2: PUBLICATION STATISTICAL BAR CHART */}
+            {/* TAB 2: SBF MICROCIRCULATION STANDALONE */}
+            {activeTab === 'sbf_standalone' && (
+              <SbfStandaloneView
+                microData={microData}
+                onUploadMicro={handleMicroUpload}
+              />
+            )}
+
+            {/* TAB 3: MYOTON BIOMECHANICS STANDALONE */}
+            {activeTab === 'myoton_standalone' && (
+              <MyotonStandaloneView
+                myotonData={myotonData}
+                onUploadMyoton={handleMyotonUpload}
+              />
+            )}
+
+            {/* TAB 4: PUBLICATION STATISTICAL BAR CHART */}
             {activeTab === 'statistics' && (
               <PublicationBarChart realData={aggregatedStats} />
             )}
 
-            {/* TAB 3: DATASET INSPECTOR & FILE UPLOADER */}
+            {/* TAB 5: DATASET INSPECTOR & FILE UPLOADER */}
             {activeTab === 'data_inspector' && (
               <div className="space-y-6">
                 {/* Upload Section */}

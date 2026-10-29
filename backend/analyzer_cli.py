@@ -1,4 +1,4 @@
-﻿"""
+"""
 Microcirculation & Myotonometer Analytics Engine - CLI Bridge for Electron / JavaScript UI
 Accepts JSON parameters or CLI flags, performs numerical DSP/Statistics, and returns structured JSON.
 """
@@ -14,19 +14,21 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
-import pandas as pd
+import warnings
+warnings.filterwarnings('ignore')
+
 from scipy import stats
 
 COMPASS_POINTS = [
-    {"id": 1, "name": "Barat Laut (NW)", "code": "NW", "row": 0, "col": 0},
-    {"id": 2, "name": "Utara (N)", "code": "N", "row": 0, "col": 1},
-    {"id": 3, "name": "Timur Laut (NE)", "code": "NE", "row": 0, "col": 2},
-    {"id": 4, "name": "Barat (W)", "code": "W", "row": 1, "col": 0},
-    {"id": 5, "name": "Tengah (C)", "code": "C", "row": 1, "col": 1},
-    {"id": 6, "name": "Timur (E)", "code": "E", "row": 1, "col": 2},
-    {"id": 7, "name": "Barat Daya (SW)", "code": "SW", "row": 2, "col": 0},
-    {"id": 8, "name": "Selatan (S)", "code": "S", "row": 2, "col": 1},
-    {"id": 9, "name": "Tenggara (SE)", "code": "SE", "row": 2, "col": 2},
+    {"id": 1, "name": "North-West (NW)", "code": "NW", "row": 0, "col": 0},
+    {"id": 2, "name": "North (N)", "code": "N", "row": 0, "col": 1},
+    {"id": 3, "name": "North-East (NE)", "code": "NE", "row": 0, "col": 2},
+    {"id": 4, "name": "West (W)", "code": "W", "row": 1, "col": 0},
+    {"id": 5, "name": "Center (C)", "code": "C", "row": 1, "col": 1},
+    {"id": 6, "name": "East (E)", "code": "E", "row": 1, "col": 2},
+    {"id": 7, "name": "South-West (SW)", "code": "SW", "row": 2, "col": 0},
+    {"id": 8, "name": "South (S)", "code": "S", "row": 2, "col": 1},
+    {"id": 9, "name": "South-East (SE)", "code": "SE", "row": 2, "col": 2},
 ]
 
 
@@ -85,6 +87,7 @@ def segment_signal(samples: np.ndarray, fs: float = 40.0, dwell_sec: float = 7.4
 
 
 def parse_microcirculation_excel(file_path: str):
+    import pandas as pd
     df_raw = pd.read_excel(file_path, header=None)
     
     # Row index 1 contains subject names (Bas at col 1, Cornel at col 13, Reuben at col 25)
@@ -121,6 +124,7 @@ def parse_microcirculation_excel(file_path: str):
 
 
 def parse_myoton_excel(file_path: str):
+    import pandas as pd
     df = pd.read_excel(file_path, header=None)
     # Subject 1 (Bas): rows 3-11 (0-indexed 3..11)
     # Subject 2 (Cornel): rows 13-21
@@ -255,9 +259,132 @@ def run_protocol_b_analysis(micro_file: str, myoton_file: str, subject: str = "B
     }
 
 
+def run_fast_protocol_b(payload: dict):
+    subject = payload.get("subject", "Bas")
+    freq = payload.get("freq", "30Hz")
+    fs = float(payload.get("fs", 40.0))
+    dwell_sec = float(payload.get("dwellDuration", 7.41))
+    estimator = payload.get("estimator", "p25")
+
+    # If raw timeseries samples are provided in payload:
+    if "beSamples" in payload and "afSamples" in payload and len(payload["beSamples"]) > 0:
+        be_samples = np.array(payload["beSamples"], dtype=float)
+        af_samples = np.array(payload["afSamples"], dtype=float)
+        dwells_be = segment_signal(be_samples, fs=fs, dwell_sec=dwell_sec, method=estimator)
+        dwells_af = segment_signal(af_samples, fs=fs, dwell_sec=dwell_sec, method=estimator)
+        flux_be_arr = [d["value"] for d in dwells_be]
+        flux_af_arr = [d["value"] for d in dwells_af]
+    elif "dwellsBefore" in payload and "dwellsAfter" in payload:
+        dwells_be_in = payload["dwellsBefore"]
+        dwells_af_in = payload["dwellsAfter"]
+        flux_be_arr = [float(d["value"] if isinstance(d, dict) else d) for d in dwells_be_in]
+        flux_af_arr = [float(d["value"] if isinstance(d, dict) else d) for d in dwells_af_in]
+    else:
+        flux_be_arr = [0.0] * 9
+        flux_af_arr = [0.0] * 9
+
+    # Helper to extract (before, after) stiffness values from various object schemas
+    def extract_stiffness(pt):
+        if isinstance(pt, dict):
+            if "stiffBefore" in pt and "stiffAfter" in pt:
+                return float(pt.get("stiffBefore", 0.0)), float(pt.get("stiffAfter", 0.0))
+            if "frequencies" in pt and isinstance(pt["frequencies"], dict) and freq in pt["frequencies"]:
+                f_obj = pt["frequencies"][freq]
+                return float(f_obj.get("before", 0.0)), float(f_obj.get("after", 0.0))
+            if "before" in pt and "after" in pt:
+                return float(pt.get("before", 0.0)), float(pt.get("after", 0.0))
+        elif isinstance(pt, (int, float)):
+            return float(pt), float(pt)
+        return 0.0, 0.0
+
+    # Myoton points
+    myo_be_arr = []
+    myo_af_arr = []
+    myo_pts = payload.get("myotonPoints", [])
+    if isinstance(myo_pts, dict):
+        for i in range(1, 10):
+            pt = myo_pts.get(str(i), myo_pts.get(i, {}))
+            sb, sa = extract_stiffness(pt)
+            myo_be_arr.append(sb)
+            myo_af_arr.append(sa)
+    elif isinstance(myo_pts, list):
+        for i in range(9):
+            if i < len(myo_pts):
+                sb, sa = extract_stiffness(myo_pts[i])
+                myo_be_arr.append(sb)
+                myo_af_arr.append(sa)
+            else:
+                myo_be_arr.append(0.0)
+                myo_af_arr.append(0.0)
+    else:
+        myo_be_arr = [0.0] * 9
+        myo_af_arr = [0.0] * 9
+
+    flux_d_arr = [round(fa - fb, 2) for fb, fa in zip(flux_be_arr, flux_af_arr)]
+    stiff_d_arr = [round(sa - sb, 2) for sb, sa in zip(myo_be_arr, myo_af_arr)]
+
+    cells = []
+    for i in range(9):
+        p_id = i + 1
+        cp = COMPASS_POINTS[i]
+        fb = flux_be_arr[i]
+        fa = flux_af_arr[i]
+        df = flux_d_arr[i]
+        sb = myo_be_arr[i]
+        sa = myo_af_arr[i]
+        ds = stiff_d_arr[i]
+
+        cells.append({
+            "id": p_id,
+            "name": cp["name"],
+            "code": cp["code"],
+            "row": cp["row"],
+            "col": cp["col"],
+            "fluxBefore": fb,
+            "fluxAfter": fa,
+            "fluxDelta": df,
+            "fluxChangePct": round((df / fb * 100), 1) if fb > 0 else 0.0,
+            "stiffBefore": sb,
+            "stiffAfter": sa,
+            "stiffDelta": ds,
+            "stiffChangePct": round((ds / sb * 100), 1) if sb > 0 else 0.0
+        })
+
+    # Statistical Concordance via SciPy
+    spearman_rho, spearman_p = stats.spearmanr(flux_d_arr, stiff_d_arr)
+    pearson_r, pearson_p = stats.pearsonr(flux_d_arr, stiff_d_arr)
+
+    return {
+        "status": "success",
+        "engine": "Python SciPy Core (Fast In-Memory IPC)",
+        "subject": subject,
+        "frequency": freq,
+        "samplingRateHz": fs,
+        "dwellDurationSec": dwell_sec,
+        "estimator": estimator,
+        "cells": cells,
+        "correlations": {
+            "deltaSpearman": round(float(spearman_rho), 3) if not np.isnan(spearman_rho) else 0.0,
+            "deltaSpearmanPValue": round(float(spearman_p), 4) if not np.isnan(spearman_p) else 1.0,
+            "deltaPearson": round(float(pearson_r), 3) if not np.isnan(pearson_r) else 0.0,
+            "deltaPearsonPValue": round(float(pearson_p), 4) if not np.isnan(pearson_p) else 1.0
+        },
+        "means": {
+            "fluxBeforeMean": round(float(np.mean(flux_be_arr)), 2),
+            "fluxAfterMean": round(float(np.mean(flux_af_arr)), 2),
+            "fluxDeltaMean": round(float(np.mean(flux_d_arr)), 2),
+            "stiffBeforeMean": round(float(np.mean(myo_be_arr)), 1),
+            "stiffAfterMean": round(float(np.mean(myo_af_arr)), 1),
+            "stiffDeltaMean": round(float(np.mean(stiff_d_arr)), 1)
+        }
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description="Microcirculation & Myoton Python CLI Analyzer")
-    parser.add_argument("--task", default="protocol_b_grid", choices=["health", "protocol_b_grid", "parse_summary"])
+    parser.add_argument("--task", default="protocol_b_grid", choices=["health", "protocol_b_grid", "fast_grid", "parse_summary"])
+    parser.add_argument("--stdin", action="store_true", help="Read payload JSON from standard input")
+    parser.add_argument("--payload-json", help="Direct JSON payload string or file")
     parser.add_argument("--micro-file", help="Path to microcirculation-data.xlsx")
     parser.add_argument("--myoton-file", help="Path to OCT_Myoton(R_R)(2).xlsx")
     parser.add_argument("--subject", default="Bas")
@@ -272,6 +399,27 @@ def main():
     if args.task == "health":
         res = {"status": "ok", "version": "2.1.0", "python": sys.version}
         print(json.dumps(res, indent=2))
+        return
+
+    # Fast Grid Execution via stdin or payload-json
+    if args.task == "fast_grid" or args.stdin or args.payload_json:
+        if args.stdin:
+            input_data = sys.stdin.read()
+            payload = json.loads(input_data)
+        elif args.payload_json:
+            if os.path.exists(args.payload_json):
+                with open(args.payload_json, "r", encoding="utf-8") as pf:
+                    payload = json.load(pf)
+            else:
+                payload = json.loads(args.payload_json)
+        else:
+            payload = {}
+
+        result = run_fast_protocol_b(payload)
+        if args.output_json:
+            with open(args.output_json, "w", encoding="utf-8") as f:
+                json.dump(result, f, indent=2)
+        print(json.dumps(result, indent=2))
         return
 
     if args.task == "protocol_b_grid":
