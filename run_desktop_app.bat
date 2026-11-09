@@ -1,9 +1,10 @@
 @echo off
-chcp 65001 > nul
-title Microcirculation & Myoton Research Suite - GUI Launcher
+setlocal enabledelayedexpansion
+cd /d "%~dp0"
+title Microcirculation and Myoton Research Suite - GUI Launcher
 
 echo ================================================================================
-echo  🔬 MENJALANKAN MICROCIRCULATION & MYOTON RESEARCH SUITE
+echo  [LAUNCHER] MENJALANKAN MICROCIRCULATION AND MYOTON RESEARCH SUITE
 echo ================================================================================
 echo.
 
