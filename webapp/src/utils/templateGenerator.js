@@ -5,7 +5,7 @@
  */
 
 import * as XLSX from 'xlsx';
-import { COMPASS_POINTS } from './excelParser';
+import { COMPASS_POINTS } from './excelParser.js';
 
 /**
  * Creates standardized Microcirculation SBF workbook with sample data and instructions
@@ -88,69 +88,197 @@ export function createMicrocirculationWorkbook(subjectNames = ['Subject_A', 'Sub
 }
 
 /**
- * Creates standardized Myoton 9-Point Compass Grid workbook
+ * Creates standardized Myoton workbook in the new OCT Foot Measurement Record format
+ * (matching KYLE OCT.xlsx) with 6 clinical protocols and triplicate measurements.
  */
-export function createMyotonWorkbook(subjectNames = ['Subject 1 (Subject_A)', 'Subject 2 (Subject_B)']) {
+export function createMyotonWorkbook(participantInput = ['KYLE']) {
   const wb = XLSX.utils.book_new();
 
-  const headerRow0 = ['', '', '', '', '', '', '', '', '', 'T1', '', 'M1', ''];
-  const headerRow1 = [
-    '',
-    'before1_30', 'after1_30',
-    'before1_50', 'after1_50',
-    'before1_100', 'after1_100',
-    '', '',
-    'before1_30', 'after1_30',
-    'before1_30', 'after1_30'
+  const participants = Array.isArray(participantInput) ? participantInput : [participantInput];
+
+  // Benchmark template data based on KYLE OCT.xlsx
+  const PROTOCOL_DEFS = [
+    {
+      num: 1,
+      freq: '1 Hz',
+      intensity: '30%',
+      foot: 'LEFT FOOT',
+      dateLabel: 'Date for Protocols 1 & 2:',
+      dateVal: '2026-11-02',
+      entries: [
+        [1, 816, 814, 796, 1, 793, 826, 850],
+        [2, 605, 622, 601, 2, 624, 621, 634],
+        [3, 507, 516, 521, 3, 498, 512, 537],
+        [4, 803, 820, 769, 4, 818, 796, 832],
+        [5, 657, 685, 674, 5, 714, 675, 719],
+        [6, 536, 550, 562, 6, 603, 569, 619],
+        [7, 611, 616, 585, 7, 664, 613, 631],
+        [8, 630, 616, 648, 8, 616, 623, 610],
+        [9, 602, 596, 609, 9, 604, 597, 602]
+      ]
+    },
+    {
+      num: 2,
+      freq: '1 Hz',
+      intensity: '50%',
+      foot: 'RIGHT FOOT',
+      dateLabel: null,
+      dateVal: null,
+      entries: [
+        [1, 855, 844, 850, 1, 946, 908, 966],
+        [2, 936, 952, 962, 2, 928, 894, 998],
+        [3, 848, 824, 809, 3, 822, 831, 809],
+        [4, 637, 621, 645, 4, 758, 731, 706],
+        [5, 927, 941, 937, 5, 936, 926, 953],
+        [6, 795, 784, 801, 6, 851, 822, 825],
+        [7, 550, 563, 566, 7, 561, 630, 606],
+        [8, 555, 599, 543, 8, 575, 583, 588],
+        [9, 508, 569, 582, 9, 590, 594, 662]
+      ]
+    },
+    {
+      num: 3,
+      freq: '1 Hz',
+      intensity: '80%',
+      foot: 'LEFT FOOT',
+      dateLabel: 'Date for Protocols 3 & 4:',
+      dateVal: '2026-11-03',
+      entries: [
+        [1, 687, 737, 731, 1, 774, 753, 769],
+        [2, 625, 610, 629, 2, 594, 611, 606],
+        [3, 561, 559, 569, 3, 543, 558, 555],
+        [4, 730, 753, 738, 4, 755, 745, 749],
+        [5, 701, 659, 699, 5, 655, 674, 677],
+        [6, 584, 589, 598, 6, 610, 576, 588],
+        [7, 669, 650, 703, 7, 692, 670, 627],
+        [8, 631, 651, 659, 8, 647, 642, 696],
+        [9, 523, 518, 523, 9, 571, 600, 617]
+      ]
+    },
+    {
+      num: 4,
+      freq: '50 Hz',
+      intensity: '30%',
+      foot: 'RIGHT FOOT',
+      dateLabel: null,
+      dateVal: null,
+      entries: [
+        [1, 761, 768, 742, 1, 776, 770, 803],
+        [2, 792, 712, 679, 2, 727, 663, 751],
+        [3, 784, 807, 818, 3, 839, 795, 793],
+        [4, 843, 869, 858, 4, 931, 915, 877],
+        [5, 944, 950, 959, 5, 963, 950, 969],
+        [6, 839, 880, 900, 6, 915, 980, 914],
+        [7, 634, 659, 665, 7, 638, 532, 651],
+        [8, 715, 695, 754, 8, 692, 688, 735],
+        [9, 708, 723, 753, 9, 742, 749, 734]
+      ]
+    },
+    {
+      num: 5,
+      freq: '50 Hz',
+      intensity: '50%',
+      foot: 'LEFT FOOT',
+      dateLabel: 'Date for Protocols 5 & 6:',
+      dateVal: '2026-11-04',
+      entries: [
+        [1, 616, 568, 576, 1, 602, 581, 634],
+        [2, 478, 464, 490, 2, 502, 502, 506],
+        [3, 484, 483, 511, 3, 485, 488, 489],
+        [4, 628, 650, 696, 4, 769, 692, 678],
+        [5, 537, 543, 572, 5, 558, 578, 557],
+        [6, 541, 523, 530, 6, 582, 600, 557],
+        [7, 687, 660, 700, 7, 747, 777, 787],
+        [8, 580, 532, 576, 8, 610, 654, 620],
+        [9, 514, 529, 502, 9, 602, 560, 565]
+      ]
+    },
+    {
+      num: 6,
+      freq: '50 Hz',
+      intensity: '80%',
+      foot: 'RIGHT FOOT',
+      dateLabel: null,
+      dateVal: null,
+      entries: [
+        [1, 876, 862, 835, 1, 973, 836, 860],
+        [2, 931, 981, 968, 2, 946, 929, 875],
+        [3, 792, 787, 781, 3, 836, 806, 796],
+        [4, 826, 813, 751, 4, 917, 915, 866],
+        [5, 982, 942, 955, 5, 969, 964, 980],
+        [6, 838, 912, 854, 6, 892, 853, 924],
+        [7, 553, 620, 622, 7, 601, 612, 644],
+        [8, 653, 653, 685, 8, 644, 626, 632],
+        [9, 687, 674, 725, 9, 697, 687, 616]
+      ]
+    }
   ];
 
-  const allRows = [headerRow0, headerRow1];
+  participants.forEach((pRawName, pIdx) => {
+    const cleanName = String(pRawName || `Participant_${pIdx + 1}`).trim();
+    const sheetRows = [
+      ['OCT FOOT MEASUREMENT RECORD', '', '', '', '', '', '', ''],
+      ['', '', '', '', '', '', '', ''],
+      [`Participant :${cleanName}`, '', '', '', '', '', '', ''],
+      ['', '', '', '', '', '', '', '']
+    ];
 
-  subjectNames.forEach((sTitle, sIdx) => {
-    allRows.push([sTitle, '', '', '', '', '', '', '', '', '', '', '', '']);
+    PROTOCOL_DEFS.forEach((pDef) => {
+      if (pDef.dateLabel) {
+        sheetRows.push([pDef.dateLabel, pDef.dateVal, '', '', '', '', '', '']);
+      }
+      sheetRows.push([`Protocol ${pDef.num} \u2013 Frequency: ${pDef.freq} \u2013 Intensity: ${pDef.intensity}`, '', '', '', '', '', '', '']);
+      sheetRows.push([pDef.foot, '', '', '', '', '', '', '']);
+      sheetRows.push(['BEFORE', '', '', '', 'AFTER', '', '', '']);
+      sheetRows.push(['Entry', 'E1', 'E2', 'E3', 'Entry', 'E1', 'E2', 'E3']);
 
-    COMPASS_POINTS.forEach((cp) => {
-      const baseStiff = 400 + cp.id * 8 + sIdx * 10;
-      const row = [
-        cp.id, // Point ID 1 to 9
-        Number((baseStiff).toFixed(1)),
-        Number((baseStiff - 35).toFixed(1)),
-        Number((baseStiff + 20).toFixed(1)),
-        Number((baseStiff - 15).toFixed(1)),
-        Number((baseStiff + 10).toFixed(1)),
-        Number((baseStiff - 20).toFixed(1)),
-        '', '',
-        Number((450 + cp.id * 5).toFixed(1)),
-        Number((440 + cp.id * 5).toFixed(1)),
-        Number((500 + cp.id * 6).toFixed(1)),
-        Number((485 + cp.id * 6).toFixed(1))
-      ];
-      allRows.push(row);
+      pDef.entries.forEach((row) => {
+        sheetRows.push(row);
+      });
+
+      sheetRows.push(['', '', '', '', '', '', '', '']);
     });
+
+    const ws = XLSX.utils.aoa_to_sheet(sheetRows);
+    const sName = participants.length === 1 ? 'Sheet1' : cleanName.slice(0, 31);
+    XLSX.utils.book_append_sheet(wb, ws, sName);
   });
 
-  const wsData = XLSX.utils.aoa_to_sheet(allRows);
-  XLSX.utils.book_append_sheet(wb, wsData, 'myoton');
-
-  // Compass Snake Grid Guide
+  // Comprehensive Guide Sheet
   const guideRows = [
-    ['MYOTONOMETER 9-POINT COMPASS GRID GUIDE ("SNAKE" RASTER SEQUENCE)'],
-    ['========================================================================'],
-    ['Row Sequence 1 through 9 for Each Subject:'],
-    ['  1. North-West (NW) -> Matrix Row 1, Column 1 (Top-Left)'],
-    ['  2. North (N)       -> Matrix Row 1, Column 2 (Top-Center)'],
-    ['  3. North-East (NE) -> Matrix Row 1, Column 3 (Top-Right)'],
-    ['  4. West (W)        -> Matrix Row 2, Column 1 (Center-Left)'],
-    ['  5. Center (C)      -> Matrix Row 2, Column 2 (Grid Center)'],
-    ['  6. East (E)        -> Matrix Row 2, Column 3 (Center-Right)'],
-    ['  7. South-West (SW) -> Matrix Row 3, Column 1 (Bottom-Left)'],
-    ['  8. South (S)       -> Matrix Row 3, Column 2 (Bottom-Center)'],
-    ['  9. South-East (SE) -> Matrix Row 3, Column 3 (Bottom-Right)'],
+    ['OCT FOOT MEASUREMENT RECORD - STANDARDIZED TEMPLATE GUIDE'],
+    ['============================================================'],
+    ['1. File & Header Structure:'],
+    ['   - Row 1: "OCT FOOT MEASUREMENT RECORD"'],
+    ['   - Row 3: "Participant :[Participant_Name]"'],
     [''],
-    ['Metric Unit: Dynamic Stiffness (N/m). Optional parameters: T1 and M1.']
+    ['2. Standard Protocol Matrix (6 Standardized Protocols):'],
+    ['   - Protocol 1: Frequency 1 Hz, Intensity 30%, LEFT FOOT'],
+    ['   - Protocol 2: Frequency 1 Hz, Intensity 50%, RIGHT FOOT'],
+    ['   - Protocol 3: Frequency 1 Hz, Intensity 80%, LEFT FOOT'],
+    ['   - Protocol 4: Frequency 50 Hz, Intensity 30%, RIGHT FOOT'],
+    ['   - Protocol 5: Frequency 50 Hz, Intensity 50%, LEFT FOOT'],
+    ['   - Protocol 6: Frequency 50 Hz, Intensity 80%, RIGHT FOOT'],
+    [''],
+    ['3. Triplicate Measurements (E1, E2, E3):'],
+    ['   - Each entry (Points 1 to 9) records 3 rapid consecutive oscillations.'],
+    ['   - Platform automatically computes Mean, Delta (After - Before), SD, and CV%.'],
+    [''],
+    ['4. 9-Point Compass Snake Raster Mapping:'],
+    ['   - Entry 1: North-West (NW) -> Grid [Row 0, Col 0]'],
+    ['   - Entry 2: North (N)       -> Grid [Row 0, Col 1]'],
+    ['   - Entry 3: North-East (NE) -> Grid [Row 0, Col 2]'],
+    ['   - Entry 4: West (W)        -> Grid [Row 1, Col 0]'],
+    ['   - Entry 5: Center (C)      -> Grid [Row 1, Col 1]'],
+    ['   - Entry 6: East (E)        -> Grid [Row 1, Col 2]'],
+    ['   - Entry 7: South-West (SW) -> Grid [Row 2, Col 0]'],
+    ['   - Entry 8: South (S)       -> Grid [Row 2, Col 1]'],
+    ['   - Entry 9: South-East (SE) -> Grid [Row 2, Col 2]'],
+    [''],
+    ['5. Metric Units: Dynamic Stiffness (N/m). Baseline typically ranges 450 - 950 N/m.']
   ];
   const wsGuide = XLSX.utils.aoa_to_sheet(guideRows);
-  XLSX.utils.book_append_sheet(wb, wsGuide, 'Compass_Grid_Guide');
+  XLSX.utils.book_append_sheet(wb, wsGuide, 'Format_Guide');
 
   return wb;
 }
@@ -158,14 +286,18 @@ export function createMyotonWorkbook(subjectNames = ['Subject 1 (Subject_A)', 'S
 /**
  * Creates a unified workbook containing BOTH Microcirculation and Myoton sheets
  */
-export function createUnifiedWorkbook(subjectNames = ['Subject_A', 'Subject_B']) {
+export function createUnifiedWorkbook(subjectNames = ['KYLE', 'Subject_B']) {
   const wbMicro = createMicrocirculationWorkbook(subjectNames);
-  const wbMyo = createMyotonWorkbook(subjectNames.map((n, i) => `Subject ${i + 1} (${n})`));
+  const wbMyo = createMyotonWorkbook(subjectNames);
 
   const wbUnified = XLSX.utils.book_new();
+  // Append SBF sheet
   XLSX.utils.book_append_sheet(wbUnified, wbMicro.Sheets['SBF_Signal_Data'], 'Microcirculation_SBF');
-  XLSX.utils.book_append_sheet(wbUnified, wbMyo.Sheets['myoton'], 'OCT_Myoton_9Point');
-  XLSX.utils.book_append_sheet(wbUnified, wbMicro.Sheets['Format_Guide'], 'User_Guide');
+  // Append OCT Myoton Sheet
+  const myoSheetKey = wbMyo.SheetNames.find(n => n !== 'Format_Guide') || wbMyo.SheetNames[0];
+  XLSX.utils.book_append_sheet(wbUnified, wbMyo.Sheets[myoSheetKey], 'OCT_Foot_Measurement');
+  // Append Format Guide
+  XLSX.utils.book_append_sheet(wbUnified, wbMyo.Sheets['Format_Guide'] || wbMicro.Sheets['Format_Guide'], 'Format_Guide');
 
   return wbUnified;
 }
@@ -199,11 +331,11 @@ export function downloadMicrocirculationTemplate() {
 }
 
 export function downloadMyotonTemplate() {
-  const wb = createMyotonWorkbook(['Subject 1 (Subject_1)', 'Subject 2 (Subject_2)', 'Subject 3 (Subject_3)']);
-  downloadWorkbook(wb, 'Standard_Myoton_9Point_Grid_Template.xlsx');
+  const wb = createMyotonWorkbook(['KYLE']);
+  downloadWorkbook(wb, 'Standard_OCT_Foot_Measurement_Template.xlsx');
 }
 
 export function downloadUnifiedTemplate() {
-  const wb = createUnifiedWorkbook(['Subject_1', 'Subject_2', 'Subject_3']);
+  const wb = createUnifiedWorkbook(['KYLE', 'Subject_B']);
   downloadWorkbook(wb, 'Standard_Unified_SBF_and_Myoton_Template.xlsx');
 }

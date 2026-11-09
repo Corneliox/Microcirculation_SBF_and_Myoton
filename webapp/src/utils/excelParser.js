@@ -16,7 +16,7 @@
  */
 
 import * as XLSX from 'xlsx';
-import { calculateDwellValue, mean, std, pairedTTest, oneWayAnova, spearmanCorrelation, pearsonCorrelation } from './statistics';
+import { calculateDwellValue, mean, std, pairedTTest, oneWayAnova, spearmanCorrelation, pearsonCorrelation } from './statistics.js';
 
 export const COMPASS_POINTS = [
   { id: 1, name: 'North-West (NW)', code: 'NW', row: 0, col: 0 },
@@ -35,8 +35,16 @@ export const COMPASS_POINTS = [
  * Automatically detects subject names, column offsets, and numeric data start.
  */
 export function parseMicrocirculationWorkbook(workbook) {
-  const sheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
+  // Check for the most relevant sheet if multiple sheets exist
+  let targetSheetName = workbook.SheetNames[0];
+  for (const sName of workbook.SheetNames) {
+    if (sName.toLowerCase().includes('micro') || sName.toLowerCase().includes('sbf')) {
+      targetSheetName = sName;
+      break;
+    }
+  }
+
+  const sheet = workbook.Sheets[targetSheetName];
   const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
 
   if (!rawData || rawData.length < 4) {
@@ -328,20 +336,56 @@ export function parseKyleProtocolRecord(rawData) {
  * Also auto-detects new multi-protocol format (KYLE OCT.xlsx).
  */
 export function parseMyotonWorkbook(workbook) {
-  const sheetName = workbook.SheetNames[0];
-  const sheet = workbook.Sheets[sheetName];
-  const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+  let combinedResults = {};
+  let kyleSheetFound = false;
 
-  // 1. Check if this is the new OCT Foot Measurement Record format (e.g. KYLE OCT.xlsx)
-  const isKyleFormat = rawData.some(row =>
-    row && typeof row[0] === 'string' &&
-    (row[0].includes('OCT FOOT MEASUREMENT') || row[0].toLowerCase().includes('participant') || row[0].toLowerCase().startsWith('protocol'))
-  );
+  // 1. Scan all sheets for the new OCT Foot Measurement Record format (e.g. KYLE OCT.xlsx)
+  for (const sName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sName];
+    if (!sheet) continue;
+    const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    if (!rawData || rawData.length === 0) continue;
 
-  if (isKyleFormat) {
-    return parseKyleProtocolRecord(rawData);
+    const isKyleFormat = rawData.some(row =>
+      row && typeof row[0] === 'string' &&
+      (row[0].includes('OCT FOOT MEASUREMENT') || row[0].toLowerCase().includes('participant') || row[0].toLowerCase().startsWith('protocol'))
+    );
+
+    if (isKyleFormat) {
+      const parsed = parseKyleProtocolRecord(rawData);
+      combinedResults = { ...combinedResults, ...parsed };
+      kyleSheetFound = true;
+    }
   }
 
+  if (kyleSheetFound) {
+    return combinedResults;
+  }
+
+  // 2. Fallback to scanning sheets for Legacy Subject format
+  let legacyRawData = null;
+  for (const sName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sName];
+    if (!sheet) continue;
+    const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+    if (!rawData || rawData.length === 0) continue;
+
+    const hasSubject = rawData.some(row =>
+      row && typeof row[0] === 'string' &&
+      (row[0].toLowerCase().includes('subject') || row[0].toLowerCase().includes('subjek'))
+    );
+    if (hasSubject) {
+      legacyRawData = rawData;
+      break;
+    }
+  }
+
+  if (!legacyRawData) {
+    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+    legacyRawData = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+  }
+
+  const rawData = legacyRawData;
   const subjectSections = [];
 
   // Dynamically scan column 0 for subject header rows

@@ -55,7 +55,7 @@ echo [OK] Unit Test Python LULUS 100%%!
 echo.
 
 :: 3. Jalankan Pengujian Parser JavaScript jika Node.js tersedia
-echo [2/3] Menjalankan Pengujian Parser JavaScript (Node.js)...
+echo [2/3] Menjalankan Pengujian Parser dan Generator Template JavaScript (Node.js)...
 node -v >nul 2>&1
 if %ERRORLEVEL% EQU 0 (
     node webapp/test_kyle_parser.js
@@ -64,7 +64,13 @@ if %ERRORLEVEL% EQU 0 (
         pause
         exit /b !ERRORLEVEL!
     )
-    echo [OK] Pengujian Parser JavaScript LULUS!
+    node webapp/test_template_roundtrip.js
+    if !ERRORLEVEL! NEQ 0 (
+        echo [GAGAL] Terjadi kesalahan pada generator template JavaScript!
+        pause
+        exit /b !ERRORLEVEL!
+    )
+    echo [OK] Pengujian Parser dan Template Generator JavaScript LULUS!
 ) else (
     echo [INFO] Node.js tidak terdeteksi di PATH global. Melewati uji JS langsung.
 )

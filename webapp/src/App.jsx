@@ -56,12 +56,26 @@ export default function App() {
         const parsedMicro = parseMicrocirculationWorkbook(wbMicro);
         setMicroData(parsedMicro);
 
-        // 2. Fetch Myoton dataset
-        const resMyo = await fetch(`${cleanBase}data/OCT_Myoton(R_R)(2).xlsx`);
-        if (!resMyo.ok) throw new Error(`Failed to load OCT_Myoton(R_R)(2).xlsx (${resMyo.statusText})`);
-        const abMyo = await resMyo.arrayBuffer();
-        const wbMyo = XLSX.read(abMyo, { type: 'array' });
-        const parsedMyo = parseMyotonWorkbook(wbMyo);
+        // 2. Fetch Myoton dataset (Default to new standardized KYLE OCT multi-protocol format)
+        let parsedMyo = null;
+        try {
+          const resMyo = await fetch(`${cleanBase}data/KYLE OCT.xlsx`);
+          if (resMyo.ok) {
+            const abMyo = await resMyo.arrayBuffer();
+            const wbMyo = XLSX.read(abMyo, { type: 'array' });
+            parsedMyo = parseMyotonWorkbook(wbMyo);
+          }
+        } catch (e) {
+          console.warn('KYLE OCT.xlsx failed to load, attempting legacy fallback:', e);
+        }
+
+        if (!parsedMyo) {
+          const resLegacy = await fetch(`${cleanBase}data/OCT_Myoton(R_R)(2).xlsx`);
+          if (!resLegacy.ok) throw new Error(`Failed to load Myoton dataset (${resLegacy.statusText})`);
+          const abLegacy = await resLegacy.arrayBuffer();
+          const wbLegacy = XLSX.read(abLegacy, { type: 'array' });
+          parsedMyo = parseMyotonWorkbook(wbLegacy);
+        }
         setMyotonData(parsedMyo);
       } catch (err) {
         console.error('Error auto-loading datasets:', err);

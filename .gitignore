@@ -24,6 +24,11 @@ env/
 Thumbs.db
 Desktop.ini
 
+# Node & Frontend
+node_modules/
+webapp/dist/
+~$*.xlsx
+
 # Output files from analysis runs
 analysis_out/
 *.log
