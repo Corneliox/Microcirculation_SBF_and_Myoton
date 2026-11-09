@@ -371,7 +371,7 @@ export default function HelpGuideModal({ isOpen, onClose }) {
         {/* Footer */}
         <div className="px-6 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
           <span className="text-[11px] text-slate-500">
-            Microcirculation (SBF) & Myotonometer Research Platform • Version 2.2.0
+            Microcirculation (SBF) & Myotonometer Research Platform • Version 2.7.0
           </span>
           <button
             onClick={onClose}

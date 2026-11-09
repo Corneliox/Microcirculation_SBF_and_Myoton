@@ -27,6 +27,7 @@ Desktop.ini
 # Node & Frontend
 node_modules/
 webapp/dist/
+webapp/release/
 ~$*.xlsx
 
 # Output files from analysis runs

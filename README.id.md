@@ -45,10 +45,13 @@ Aplikasi riset ini mengintegrasikan pengukuran mikrosirkulasi optik dengan diagn
 * **Tab Analisis Mandiri / Terpisah (v2.4.0):**
   * **Tab Mandiri SBF:** Analisis sinyal Laser-Doppler saja (9 kinetika dwell, perubahan vasodilatasi %) tanpa memerlukan data Myoton.
   * **Tab Mandiri Myoton:** Analisis biomekanika jaringan saja (grid 3×3, kekakuan dinamis $S$, $T_1$, $M_1$) tanpa memerlukan data SBF.
-* **Dukungan Format Baru Multi-Protokol & Triplikat (v2.5.0):**
-  * Mendukung otomatis format baru `KYLE OCT.xlsx` (*OCT Foot Measurement Record*).
+* **Dukungan Format Baru Multi-Protokol & Triplikat (v2.5.0 - v2.7.0):**
+  * Mendukung otomatis format baru `KYLE OCT.xlsx` / `NewFormat.xlsx` (*OCT Foot Measurement Record*).
   * Mengekstrak 6 protokol klinis (1 Hz, 50 Hz • Intensitas 30%, 50%, 80% • Kaki Kiri vs Kaki Kanan).
   * Mengagregasi pengukuran triplikat ($E_1, E_2, E_3$ Sebelum dan Sesudah) dengan metrik $\text{Mean} \pm \text{SD}$, perubahan kekakuan $\Delta S$, dan reliabilitas CV%.
+* **Installer Desktop Mandiri 1-Klik & Template Resmi (v2.7.0):**
+  * **Satu Installer Windows Desktop:** Installer mandiri NSIS (`Microcirculation & Myoton Suite Setup 2.7.0.exe`) yang memaketkan antarmuka Electron dan backend analitik Python bawaan (`analyzer.exe`) tanpa perlu instalasi Python terpisah.
+  * **Template Resmi Kosong (`NewFormat.xlsx`):** Unduhan langsung template kosong standar siap isi di seluruh menu aplikasi.
 * **Berkas Otomasi Pengujian 1-Klik (.bat):**
   * `test_kyle_dataset.bat`: Uji otomatis Python & Node.js untuk `KYLE OCT.xlsx` dengan tampilan tabel ringkasan 6 protokol lengkap di konsol.
   * `run_desktop_app.bat`: Peluncur 1-klik aplikasi GUI interaktif.

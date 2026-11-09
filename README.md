@@ -44,10 +44,13 @@ This research software integrates optical microcirculation measurements with mec
 * **Standalone Modality Analysis Tabs (v2.4.0):**
   * **SBF Standalone Tab:** Process Laser-Doppler perfusion signals alone (9 dwell kinetics, plateau estimators, % vasodilation) without requiring Myoton data.
   * **Myoton Standalone Tab:** Process tissue biomechanics alone (9-point spatial matrix, dynamic stiffness $S$, $T_1$, $M_1$, % softening) without requiring SBF data.
-* **Multi-Protocol & Triplicates Support (v2.5.0):**
-  * Automatic detection of new multi-protocol format (`KYLE OCT.xlsx` / OCT Foot Measurement Record).
+* **Multi-Protocol & Triplicates Support (v2.5.0 - v2.7.0):**
+  * Automatic detection of multi-protocol format (`KYLE OCT.xlsx` / `NewFormat.xlsx` / OCT Foot Measurement Record).
   * Ingests 6 clinical protocols (1 Hz, 50 Hz • 30%, 50%, 80% • Left Foot vs Right Foot).
   * Automatically aggregates triplicate measurements ($E_1, E_2, E_3$ Before and After) with Mean $\pm$ SD, $\Delta S$, and CV% reliability tracking.
+* **Standalone 1-Click Desktop Installer & Official Template (v2.7.0):**
+  * **Single Windows Desktop Installer:** 1-click NSIS Installer (`Microcirculation & Myoton Suite Setup 2.7.0.exe`) bundling the entire Electron app and self-contained native Python backend (`analyzer.exe`) without needing external Python installed.
+  * **Official Blank Template (`NewFormat.xlsx`):** Direct 1-click download of the official blank data collection template across all UI entry points.
 * **One-Click Batch Test Runners (.bat):**
   * `test_kyle_dataset.bat`: Automated Python & Node.js verification test for `KYLE OCT.xlsx` displaying full 6-protocol summary tables.
   * `run_desktop_app.bat`: 1-click launcher for the interactive application GUI.
