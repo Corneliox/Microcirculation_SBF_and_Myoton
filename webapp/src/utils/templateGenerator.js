@@ -89,14 +89,14 @@ export function createMicrocirculationWorkbook(subjectNames = ['Subject_A', 'Sub
 
 /**
  * Creates standardized Myoton workbook in the new OCT Foot Measurement Record format
- * (matching KYLE OCT.xlsx) with 6 clinical protocols and triplicate measurements.
+ * (matching NewFormat.xlsx / KYLE OCT.xlsx) with 6 clinical protocols and triplicate measurements.
  */
-export function createMyotonWorkbook(participantInput = ['KYLE']) {
+export function createMyotonWorkbook(participantInput = ['KYLE'], includeSampleData = false) {
   const wb = XLSX.utils.book_new();
 
   const participants = Array.isArray(participantInput) ? participantInput : [participantInput];
 
-  // Benchmark template data based on KYLE OCT.xlsx
+  // Benchmark template data based on KYLE OCT.xlsx / NewFormat.xlsx
   const PROTOCOL_DEFS = [
     {
       num: 1,
@@ -105,7 +105,7 @@ export function createMyotonWorkbook(participantInput = ['KYLE']) {
       foot: 'LEFT FOOT',
       dateLabel: 'Date for Protocols 1 & 2:',
       dateVal: '2026-11-02',
-      entries: [
+      samples: [
         [1, 816, 814, 796, 1, 793, 826, 850],
         [2, 605, 622, 601, 2, 624, 621, 634],
         [3, 507, 516, 521, 3, 498, 512, 537],
@@ -124,7 +124,7 @@ export function createMyotonWorkbook(participantInput = ['KYLE']) {
       foot: 'RIGHT FOOT',
       dateLabel: null,
       dateVal: null,
-      entries: [
+      samples: [
         [1, 855, 844, 850, 1, 946, 908, 966],
         [2, 936, 952, 962, 2, 928, 894, 998],
         [3, 848, 824, 809, 3, 822, 831, 809],
@@ -143,7 +143,7 @@ export function createMyotonWorkbook(participantInput = ['KYLE']) {
       foot: 'LEFT FOOT',
       dateLabel: 'Date for Protocols 3 & 4:',
       dateVal: '2026-11-03',
-      entries: [
+      samples: [
         [1, 687, 737, 731, 1, 774, 753, 769],
         [2, 625, 610, 629, 2, 594, 611, 606],
         [3, 561, 559, 569, 3, 543, 558, 555],
@@ -162,7 +162,7 @@ export function createMyotonWorkbook(participantInput = ['KYLE']) {
       foot: 'RIGHT FOOT',
       dateLabel: null,
       dateVal: null,
-      entries: [
+      samples: [
         [1, 761, 768, 742, 1, 776, 770, 803],
         [2, 792, 712, 679, 2, 727, 663, 751],
         [3, 784, 807, 818, 3, 839, 795, 793],
@@ -181,7 +181,7 @@ export function createMyotonWorkbook(participantInput = ['KYLE']) {
       foot: 'LEFT FOOT',
       dateLabel: 'Date for Protocols 5 & 6:',
       dateVal: '2026-11-04',
-      entries: [
+      samples: [
         [1, 616, 568, 576, 1, 602, 581, 634],
         [2, 478, 464, 490, 2, 502, 502, 506],
         [3, 484, 483, 511, 3, 485, 488, 489],
@@ -200,7 +200,7 @@ export function createMyotonWorkbook(participantInput = ['KYLE']) {
       foot: 'RIGHT FOOT',
       dateLabel: null,
       dateVal: null,
-      entries: [
+      samples: [
         [1, 876, 862, 835, 1, 973, 836, 860],
         [2, 931, 981, 968, 2, 946, 929, 875],
         [3, 792, 787, 781, 3, 836, 806, 796],
@@ -225,16 +225,21 @@ export function createMyotonWorkbook(participantInput = ['KYLE']) {
 
     PROTOCOL_DEFS.forEach((pDef) => {
       if (pDef.dateLabel) {
-        sheetRows.push([pDef.dateLabel, pDef.dateVal, '', '', '', '', '', '']);
+        sheetRows.push([pDef.dateLabel, includeSampleData ? pDef.dateVal : '', '', '', '', '', '', '']);
       }
       sheetRows.push([`Protocol ${pDef.num} \u2013 Frequency: ${pDef.freq} \u2013 Intensity: ${pDef.intensity}`, '', '', '', '', '', '', '']);
       sheetRows.push([pDef.foot, '', '', '', '', '', '', '']);
       sheetRows.push(['BEFORE', '', '', '', 'AFTER', '', '', '']);
       sheetRows.push(['Entry', 'E1', 'E2', 'E3', 'Entry', 'E1', 'E2', 'E3']);
 
-      pDef.entries.forEach((row) => {
-        sheetRows.push(row);
-      });
+      if (includeSampleData) {
+        pDef.samples.forEach((row) => sheetRows.push(row));
+      } else {
+        // Generate blank entry rows 1 to 9 matching NewFormat.xlsx
+        for (let pt = 1; pt <= 9; pt++) {
+          sheetRows.push([pt, '', '', '', pt, '', '', '']);
+        }
+      }
 
       sheetRows.push(['', '', '', '', '', '', '', '']);
     });
@@ -246,8 +251,8 @@ export function createMyotonWorkbook(participantInput = ['KYLE']) {
 
   // Comprehensive Guide Sheet
   const guideRows = [
-    ['OCT FOOT MEASUREMENT RECORD - STANDARDIZED TEMPLATE GUIDE'],
-    ['============================================================'],
+    ['OCT FOOT MEASUREMENT RECORD - STANDARDIZED TEMPLATE GUIDE (NewFormat.xlsx)'],
+    ['========================================================================'],
     ['1. File & Header Structure:'],
     ['   - Row 1: "OCT FOOT MEASUREMENT RECORD"'],
     ['   - Row 3: "Participant :[Participant_Name]"'],
@@ -288,12 +293,12 @@ export function createMyotonWorkbook(participantInput = ['KYLE']) {
  */
 export function createUnifiedWorkbook(subjectNames = ['KYLE', 'Subject_B']) {
   const wbMicro = createMicrocirculationWorkbook(subjectNames);
-  const wbMyo = createMyotonWorkbook(subjectNames);
+  const wbMyo = createMyotonWorkbook(subjectNames, false);
 
   const wbUnified = XLSX.utils.book_new();
   // Append SBF sheet
   XLSX.utils.book_append_sheet(wbUnified, wbMicro.Sheets['SBF_Signal_Data'], 'Microcirculation_SBF');
-  // Append OCT Myoton Sheet
+  // Append OCT Myoton Sheet (Blank NewFormat structure)
   const myoSheetKey = wbMyo.SheetNames.find(n => n !== 'Format_Guide') || wbMyo.SheetNames[0];
   XLSX.utils.book_append_sheet(wbUnified, wbMyo.Sheets[myoSheetKey], 'OCT_Foot_Measurement');
   // Append Format Guide
@@ -330,9 +335,36 @@ export function downloadMicrocirculationTemplate() {
   downloadWorkbook(wb, 'Standard_Microcirculation_SBF_Template.xlsx');
 }
 
-export function downloadMyotonTemplate() {
-  const wb = createMyotonWorkbook(['KYLE']);
-  downloadWorkbook(wb, 'Standard_OCT_Foot_Measurement_Template.xlsx');
+/**
+ * Directly downloads the official blank NewFormat.xlsx file for Myoton data entry.
+ * Preserves the exact Excel file structure, formatting, column widths, and blank cells.
+ */
+export async function downloadMyotonTemplate() {
+  try {
+    const baseUrl = import.meta.env.BASE_URL || './';
+    const cleanBase = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
+    const res = await fetch(`${cleanBase}data/NewFormat.xlsx`);
+    if (res.ok) {
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'NewFormat.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }, 100);
+      return;
+    }
+  } catch (err) {
+    console.warn('Direct fetch of NewFormat.xlsx failed, falling back to dynamic generator:', err);
+  }
+
+  // Fallback programmatic generation if direct fetch is unavailable
+  const wb = createMyotonWorkbook(['KYLE'], false);
+  downloadWorkbook(wb, 'NewFormat.xlsx');
 }
 
 export function downloadUnifiedTemplate() {

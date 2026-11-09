@@ -1,4 +1,4 @@
-﻿import React, { useState } from 'react';
+import React, { useState } from 'react';
 import {
   X,
   BookOpen,
@@ -303,9 +303,10 @@ export default function HelpGuideModal({ isOpen, onClose }) {
                   <button
                     onClick={downloadMyotonTemplate}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold cursor-pointer"
+                    title="Download official blank NewFormat.xlsx file for Myoton data collection"
                   >
                     <Download className="w-3.5 h-3.5" />
-                    <span>Download Myoton Template</span>
+                    <span>Download Myoton (NewFormat.xlsx)</span>
                   </button>
                   <button
                     onClick={downloadUnifiedTemplate}

@@ -516,13 +516,13 @@ export default function App() {
                       <div>
                         <div className="flex items-center gap-2 mb-2">
                           <Compass className="w-4 h-4 text-amber-400" />
-                          <h4 className="text-xs font-bold text-slate-100">Myoton 9-Point Grid Template</h4>
+                          <h4 className="text-xs font-bold text-slate-100">Standard OCT Foot Template (NewFormat.xlsx)</h4>
                         </div>
                         <p className="text-[11px] text-slate-300 leading-relaxed mb-3">
-                          Raster snake compass order: 1 NW, 2 N, 3 NE, 4 W, 5 C, 6 E, 7 SW, 8 S, 9 SE. Frequency columns 30, 50, 100Hz + T1 & M1.
+                          Official OCT Foot Measurement Record format: 6 clinical protocols (1Hz & 50Hz, 30%/50%/80%, Left & Right foot) with triplicate entries (E1, E2, E3).
                         </p>
                         <div className="text-[10px] font-mono text-amber-300 bg-amber-950/60 p-2 rounded border border-amber-800/40 mb-4">
-                          3x3 Grid: NW -&gt; N -&gt; NE -&gt; W -&gt; C -&gt; E -&gt; SW -&gt; S -&gt; SE
+                          Ready-to-use blank format for data collection: Points 1 to 9 (NW -&gt; SE)
                         </div>
                       </div>
                       <button
@@ -530,7 +530,7 @@ export default function App() {
                         className="w-full flex items-center justify-center gap-1.5 py-2 px-3 bg-amber-600 hover:bg-amber-500 text-white rounded-lg text-xs font-semibold transition-all shadow-xs cursor-pointer"
                       >
                         <Download className="w-3.5 h-3.5" />
-                        <span>Download Myoton Template (.xlsx)</span>
+                        <span>Download NewFormat.xlsx Template</span>
                       </button>
                     </div>
 

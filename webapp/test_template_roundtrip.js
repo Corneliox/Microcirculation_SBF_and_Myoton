@@ -1,12 +1,34 @@
 /**
  * Unit test for template generator roundtrip and parsing
  */
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import * as XLSX from 'xlsx';
 import { createMyotonWorkbook, createUnifiedWorkbook } from './src/utils/templateGenerator.js';
 import { parseMyotonWorkbook, parseMicrocirculationWorkbook } from './src/utils/excelParser.js';
 
-console.log('[TEST] 1. Generating Default Myoton Template (KYLE format)...');
-const myoWb = createMyotonWorkbook(['KYLE']);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+console.log('[TEST] 1. Testing physical NewFormat.xlsx file parsing...');
+const newFormatPath = path.join(__dirname, '../Example/Input_26_11_9/NewFormat.xlsx');
+if (!fs.existsSync(newFormatPath)) {
+  console.error('[FAIL] NewFormat.xlsx missing at:', newFormatPath);
+  process.exit(1);
+}
+const bufNew = fs.readFileSync(newFormatPath);
+const wbNew = XLSX.read(bufNew, { type: 'buffer' });
+const parsedNew = parseMyotonWorkbook(wbNew);
+
+if (!parsedNew['KYLE'] || !parsedNew['KYLE'].protocols || parsedNew['KYLE'].protocols.length !== 6) {
+  console.error('[FAIL] Failed parsing physical NewFormat.xlsx');
+  process.exit(1);
+}
+console.log(`[PASS] Physical NewFormat.xlsx parsed successfully with ${parsedNew['KYLE'].protocols.length} protocols!`);
+
+console.log('\n[TEST] 2. Generating Default Myoton Template (KYLE benchmark values)...');
+const myoWb = createMyotonWorkbook(['KYLE'], true);
 const parsedMyo = parseMyotonWorkbook(myoWb);
 
 if (!parsedMyo['KYLE']) {
@@ -24,10 +46,6 @@ if (!kyle.protocols || kyle.protocols.length !== 6) {
 console.log(`[PASS] Verified 6 clinical protocols:`);
 kyle.protocols.forEach(p => console.log(`   - ${p.name}`));
 
-// Verify Point 1 values of Protocol 1:
-// Before: 816, 814, 796 -> 808.7
-// After: 793, 826, 850 -> 823.0
-// Delta: 14.3
 const pt1 = kyle.protocols[0].points[1];
 console.log(`[PASS] Point 1: Before=${pt1.before}, After=${pt1.after}, Delta=${pt1.delta}`);
 if (Math.abs(pt1.before - 808.7) > 0.2 || Math.abs(pt1.after - 823.0) > 0.2) {
@@ -35,7 +53,16 @@ if (Math.abs(pt1.before - 808.7) > 0.2 || Math.abs(pt1.after - 823.0) > 0.2) {
   process.exit(1);
 }
 
-console.log('\n[TEST] 2. Generating Unified Workbook (SBF + OCT Myoton)...');
+console.log('\n[TEST] 3. Generating Blank Template (matching NewFormat.xlsx)...');
+const blankWb = createMyotonWorkbook(['KYLE'], false);
+const parsedBlank = parseMyotonWorkbook(blankWb);
+if (!parsedBlank['KYLE'] || parsedBlank['KYLE'].protocols.length !== 6) {
+  console.error('[FAIL] Blank template parsing failed');
+  process.exit(1);
+}
+console.log('[PASS] Blank template generated and parsed cleanly!');
+
+console.log('\n[TEST] 4. Generating Unified Workbook (SBF + OCT Myoton)...');
 const unifiedWb = createUnifiedWorkbook(['KYLE', 'Subject_B']);
 console.log('Unified Workbook Sheets:', unifiedWb.SheetNames);
 
