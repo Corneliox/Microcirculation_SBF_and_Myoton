@@ -14,7 +14,8 @@ import {
   Info,
   Download,
   FileCheck,
-  BookOpen
+  BookOpen,
+  Footprints
 } from 'lucide-react';
 
 import ProtocolBView from './components/ProtocolBView';
@@ -142,6 +143,26 @@ export default function App() {
     reader.readAsArrayBuffer(file);
   };
 
+  // Instant loader for the new KYLE OCT dataset (Input_26_11_9)
+  const handleLoadKyleDataset = async () => {
+    try {
+      setLoading(true);
+      const baseUrl = import.meta.env.BASE_URL || './';
+      const cleanBase = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
+      const resMyo = await fetch(`${cleanBase}data/KYLE OCT.xlsx`);
+      if (!resMyo.ok) throw new Error(`Failed to load data/KYLE OCT.xlsx`);
+      const abMyo = await resMyo.arrayBuffer();
+      const wbMyo = XLSX.read(abMyo, { type: 'array' });
+      const parsedMyo = parseMyotonWorkbook(wbMyo);
+      setMyotonData(parsedMyo);
+      setActiveTab('myoton_standalone');
+    } catch (err) {
+      alert('Error loading KYLE dataset: ' + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col">
       {/* Help Modal */}
@@ -162,7 +183,7 @@ export default function App() {
                     Microcirculation & Myotonometer Research
                   </h1>
                   <span className="text-[10px] font-semibold tracking-wide bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full">
-                    v2.4.0 Desktop & Web
+                    v2.5.0 Desktop & Web
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 hidden sm:block">
@@ -214,6 +235,16 @@ export default function App() {
               >
                 <BookOpen className="w-3.5 h-3.5" />
                 <span>Workflow Guide</span>
+              </button>
+
+              {/* Instant KYLE OCT Dataset Button */}
+              <button
+                onClick={handleLoadKyleDataset}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                title="Instant Load KYLE OCT Dataset (Input_26_11_9: 6 Protocols, Triplicates E1-E3)"
+              >
+                <Footprints className="w-3.5 h-3.5" />
+                <span>Load KYLE OCT</span>
               </button>
             </div>
           </div>
@@ -544,54 +575,115 @@ export default function App() {
                 </div>
 
                 {/* Subject Summary Table */}
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs">
-                  <h3 className="text-sm font-bold text-slate-900 mb-3">
-                    Detected Subjects Summary in Dataset
-                  </h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-xs text-left">
-                      <thead className="bg-slate-50 text-slate-600 uppercase text-[10px] tracking-wider border-b border-slate-200">
-                        <tr>
-                          <th className="py-2.5 px-3">Subject</th>
-                          <th className="py-2.5 px-3">SBF Frequencies</th>
-                          <th className="py-2.5 px-3">Samples / Frequency</th>
-                          <th className="py-2.5 px-3">Total Duration (s @ 40Hz)</th>
-                          <th className="py-2.5 px-3">Myoton Grid Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100">
-                        {microData &&
-                          Object.keys(microData).map((sName, sIdx) => {
-                            const subj = microData[sName];
-                            const nSamples = subj.frequencies['30Hz']?.before?.length || 0;
-                            const dur = (nSamples / 40).toFixed(1);
-                            const myoSubj = myotonData ? myotonData[sIdx + 1] : null;
+                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-xs space-y-6">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-900 mb-2">
+                      Detected Microcirculation (SBF) Subjects
+                    </h3>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-xs text-left">
+                        <thead className="bg-slate-50 text-slate-600 uppercase text-[10px] tracking-wider border-b border-slate-200">
+                          <tr>
+                            <th className="py-2.5 px-3">Subject</th>
+                            <th className="py-2.5 px-3">SBF Frequencies</th>
+                            <th className="py-2.5 px-3">Samples / Frequency</th>
+                            <th className="py-2.5 px-3">Total Duration (s @ 40Hz)</th>
+                            <th className="py-2.5 px-3">Paired Myoton Status</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {microData &&
+                            Object.keys(microData).map((sName, sIdx) => {
+                              const subj = microData[sName];
+                              const nSamples = subj.frequencies['30Hz']?.before?.length || 0;
+                              const dur = (nSamples / 40).toFixed(1);
+                              const myoSubj = myotonData ? (myotonData[sName] || myotonData[sIdx + 1]) : null;
 
-                            return (
-                              <tr key={sName} className="hover:bg-slate-50/60">
-                                <td className="py-2.5 px-3 font-semibold text-slate-900">
-                                  {sName} (ID: {sIdx + 1})
-                                </td>
-                                <td className="py-2.5 px-3 text-slate-600">30Hz, 50Hz, 100Hz</td>
-                                <td className="py-2.5 px-3 font-mono text-slate-700">{nSamples} per phase</td>
-                                <td className="py-2.5 px-3 font-mono text-slate-700">~{dur} s</td>
-                                <td className="py-2.5 px-3">
-                                  {myoSubj ? (
-                                    <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[11px] font-medium border border-emerald-200">
-                                      <CheckCircle2 className="w-3.5 h-3.5" /> 9 Points Complete
-                                    </span>
-                                  ) : (
-                                    <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded text-[11px]">
-                                      No Myoton Data
-                                    </span>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
-                      </tbody>
-                    </table>
+                              return (
+                                <tr key={sName} className="hover:bg-slate-50/60">
+                                  <td className="py-2.5 px-3 font-semibold text-slate-900">
+                                    {sName} (ID: {sIdx + 1})
+                                  </td>
+                                  <td className="py-2.5 px-3 text-slate-600">30Hz, 50Hz, 100Hz</td>
+                                  <td className="py-2.5 px-3 font-mono text-slate-700">{nSamples} per phase</td>
+                                  <td className="py-2.5 px-3 font-mono text-slate-700">~{dur} s</td>
+                                  <td className="py-2.5 px-3">
+                                    {myoSubj ? (
+                                      <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[11px] font-medium border border-emerald-200">
+                                        <CheckCircle2 className="w-3.5 h-3.5" /> 9 Points Complete
+                                      </span>
+                                    ) : (
+                                      <span className="text-amber-600 bg-amber-50 px-2 py-0.5 rounded text-[11px]">
+                                        No Paired Myoton Data
+                                      </span>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
+
+                  {/* Myoton Standalone / Protocol Records Summary */}
+                  {myotonData && (
+                    <div className="pt-4 border-t border-slate-100">
+                      <h3 className="text-sm font-bold text-slate-900 mb-2">
+                        Detected Myoton Biomechanics Datasets
+                      </h3>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-xs text-left">
+                          <thead className="bg-slate-50 text-slate-600 uppercase text-[10px] tracking-wider border-b border-slate-200">
+                            <tr>
+                              <th className="py-2.5 px-3">Subject / Record</th>
+                              <th className="py-2.5 px-3">Dataset Format</th>
+                              <th className="py-2.5 px-3">Available Conditions / Protocols</th>
+                              <th className="py-2.5 px-3">Grid Verification</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100">
+                            {Object.keys(myotonData)
+                              .filter((k) => isNaN(k) && k !== 'ALL')
+                              .map((mKey) => {
+                                const mObj = myotonData[mKey];
+                                const isProto = mObj?.isProtocolFormat;
+                                return (
+                                  <tr key={mKey} className="hover:bg-slate-50/60">
+                                    <td className="py-2.5 px-3 font-semibold text-slate-900">
+                                      {mKey}
+                                    </td>
+                                    <td className="py-2.5 px-3">
+                                      {isProto ? (
+                                        <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 border border-indigo-200 rounded text-[11px] font-medium">
+                                          OCT Protocol & Triplicates
+                                        </span>
+                                      ) : (
+                                        <span className="px-2 py-0.5 bg-slate-100 text-slate-700 border border-slate-200 rounded text-[11px]">
+                                          Standard Frequency Matrix
+                                        </span>
+                                      )}
+                                    </td>
+                                    <td className="py-2.5 px-3 text-slate-600">
+                                      {isProto && mObj.protocols ? (
+                                        <span>{mObj.protocols.length} Protocols (1Hz, 50Hz • 30%, 50%, 80%)</span>
+                                      ) : (
+                                        <span>30Hz, 50Hz, 100Hz</span>
+                                      )}
+                                    </td>
+                                    <td className="py-2.5 px-3">
+                                      <span className="inline-flex items-center gap-1 text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded text-[11px] font-medium border border-emerald-200">
+                                        <CheckCircle2 className="w-3.5 h-3.5" /> 9 Points (Snake Raster OK)
+                                      </span>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             )}

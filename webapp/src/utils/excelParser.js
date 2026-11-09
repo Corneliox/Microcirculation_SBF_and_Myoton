@@ -135,13 +135,212 @@ export function parseMicrocirculationWorkbook(workbook) {
 }
 
 /**
+ * Parses new OCT Foot Measurement Record format (e.g. KYLE OCT.xlsx).
+ * Supports multi-protocol records (Frequency 1Hz, 50Hz; Intensity 30%, 50%, 80%; Left vs Right foot)
+ * with triplicate measurements (E1, E2, E3 Before and After).
+ */
+export function parseKyleProtocolRecord(rawData) {
+  let participant = 'KYLE';
+  const protocols = [];
+  let currentDate = null;
+
+  for (let r = 0; r < rawData.length; r++) {
+    const row = rawData[r];
+    if (!row) continue;
+    const c0 = row[0] ? String(row[0]).trim() : '';
+
+    if (c0.toLowerCase().includes('participant')) {
+      const parts = c0.split(':');
+      if (parts.length > 1 && parts[1].trim()) {
+        participant = parts[1].trim();
+      }
+    }
+
+    if (c0.toLowerCase().includes('date')) {
+      const dVal = row[1];
+      currentDate = dVal ? String(dVal) : c0;
+    }
+
+    if (c0.toLowerCase().startsWith('protocol')) {
+      const mProto = c0.match(/protocol\s*(\d+)/i);
+      const protoNum = mProto ? parseInt(mProto[1], 10) : protocols.length + 1;
+
+      const mFreq = c0.match(/frequency:\s*([\d.]+)\s*hz/i);
+      const freqStr = mFreq ? `${mFreq[1]}Hz` : 'Unknown';
+
+      const mInt = c0.match(/intensity:\s*([\d.]+)%?/i);
+      const intStr = mInt ? `${mInt[1]}%` : 'Unknown';
+
+      const nextRow = rawData[r + 1];
+      const footStr = (nextRow && nextRow[0]) ? String(nextRow[0]).trim() : 'Unknown Foot';
+
+      const points = {};
+      for (let pIdx = 1; pIdx <= 9; pIdx++) {
+        const dataR = r + 3 + pIdx;
+        const dRow = rawData[dataR] || [];
+        const compass = COMPASS_POINTS.find(cp => cp.id === pIdx);
+
+        const e1Be = parseFloat(dRow[1]) || 0;
+        const e2Be = parseFloat(dRow[2]) || 0;
+        const e3Be = parseFloat(dRow[3]) || 0;
+
+        const e1Af = parseFloat(dRow[5]) || 0;
+        const e2Af = parseFloat(dRow[6]) || 0;
+        const e3Af = parseFloat(dRow[7]) || 0;
+
+        const meanBe = Number(((e1Be + e2Be + e3Be) / 3.0).toFixed(1));
+        const meanAf = Number(((e1Af + e2Af + e3Af) / 3.0).toFixed(1));
+        const delta = Number((meanAf - meanBe).toFixed(1));
+
+        const beArr = [e1Be, e2Be, e3Be];
+        const afArr = [e1Af, e2Af, e3Af];
+        const beStd = Number(std(beArr).toFixed(1));
+        const afStd = Number(std(afArr).toFixed(1));
+        const beCv = meanBe > 0 ? Number(((beStd / meanBe) * 100).toFixed(1)) : 0;
+        const afCv = meanAf > 0 ? Number(((afStd / meanAf) * 100).toFixed(1)) : 0;
+
+        points[pIdx] = {
+          pointId: pIdx,
+          compassName: compass ? compass.name : `Point ${pIdx}`,
+          compassCode: compass ? compass.code : `P${pIdx}`,
+          gridRow: compass ? compass.row : 0,
+          gridCol: compass ? compass.col : 0,
+          before: meanBe,
+          after: meanAf,
+          delta: delta,
+          stiffChangePct: meanBe > 0 ? Number(((delta / meanBe) * 100).toFixed(1)) : 0,
+          beforeStd: beStd,
+          afterStd: afStd,
+          beforeCv: beCv,
+          afterCv: afCv,
+          triplicatesBefore: [e1Be, e2Be, e3Be],
+          triplicatesAfter: [e1Af, e2Af, e3Af]
+        };
+      }
+
+      protocols.push({
+        protocolNum: protoNum,
+        name: `Protocol ${protoNum}: ${freqStr} ${intStr} (${footStr})`,
+        shortKey: `P${protoNum}_${freqStr}_${intStr}`,
+        frequency: freqStr,
+        intensity: intStr,
+        foot: footStr,
+        date: currentDate,
+        points: points
+      });
+    }
+  }
+
+  // Construct standard points map for universal compatibility
+  const defaultProto = protocols[0] || null;
+  const standardPoints = {};
+
+  for (let pIdx = 1; pIdx <= 9; pIdx++) {
+    const compass = COMPASS_POINTS.find(cp => cp.id === pIdx);
+    const freqs = {};
+
+    protocols.forEach(proto => {
+      const pt = proto.points[pIdx];
+      if (pt) {
+        freqs[proto.name] = {
+          before: pt.before,
+          after: pt.after,
+          delta: pt.delta,
+          triplicatesBefore: pt.triplicatesBefore,
+          triplicatesAfter: pt.triplicatesAfter,
+          beforeStd: pt.beforeStd,
+          afterStd: pt.afterStd
+        };
+        freqs[proto.shortKey] = freqs[proto.name];
+      }
+    });
+
+    const p1Pt = protocols.find(p => p.frequency.includes('1'))?.points[pIdx];
+    if (p1Pt) {
+      freqs['1Hz'] = { before: p1Pt.before, after: p1Pt.after, delta: p1Pt.delta };
+    }
+    const p50Pt = protocols.find(p => p.frequency.includes('50'))?.points[pIdx];
+    if (p50Pt) {
+      freqs['50Hz'] = { before: p50Pt.before, after: p50Pt.after, delta: p50Pt.delta };
+    }
+    if (!freqs['30Hz']) {
+      freqs['30Hz'] = freqs['1Hz'] || (defaultProto ? defaultProto.points[pIdx] : { before: 0, after: 0, delta: 0 });
+    }
+    if (!freqs['100Hz']) {
+      freqs['100Hz'] = freqs['50Hz'] || (defaultProto ? defaultProto.points[pIdx] : { before: 0, after: 0, delta: 0 });
+    }
+
+    standardPoints[pIdx] = {
+      pointId: pIdx,
+      compassName: compass ? compass.name : `Point ${pIdx}`,
+      compassCode: compass ? compass.code : `P${pIdx}`,
+      gridRow: compass ? compass.row : 0,
+      gridCol: compass ? compass.col : 0,
+      frequencies: freqs
+    };
+  }
+
+  const sData = {
+    name: participant,
+    id: 1,
+    isProtocolFormat: true,
+    protocols: protocols,
+    availableProtocols: protocols.map(p => p.name),
+    availableFrequencies: [...new Set(protocols.map(p => p.frequency))],
+    points: standardPoints,
+    t1: {},
+    m1: {}
+  };
+
+  const results = {};
+  results[participant] = sData;
+  results[1] = sData;
+  results['ALL'] = sData;
+
+  const leftProtocols = protocols.filter(p => p.foot.toUpperCase().includes('LEFT'));
+  const rightProtocols = protocols.filter(p => p.foot.toUpperCase().includes('RIGHT'));
+
+  if (leftProtocols.length > 0) {
+    results[`${participant} (LEFT FOOT)`] = {
+      ...sData,
+      name: `${participant} (LEFT FOOT)`,
+      id: 2,
+      protocols: leftProtocols,
+      availableProtocols: leftProtocols.map(p => p.name)
+    };
+  }
+  if (rightProtocols.length > 0) {
+    results[`${participant} (RIGHT FOOT)`] = {
+      ...sData,
+      name: `${participant} (RIGHT FOOT)`,
+      id: 3,
+      protocols: rightProtocols,
+      availableProtocols: rightProtocols.map(p => p.name)
+    };
+  }
+
+  return results;
+}
+
+/**
  * Parses OCT_Myoton(R_R)(2).xlsx into structured 9-point grid datasets.
  * Dynamically detects subject markers and points 1-9 in snake compass order.
+ * Also auto-detects new multi-protocol format (KYLE OCT.xlsx).
  */
 export function parseMyotonWorkbook(workbook) {
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
   const rawData = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+
+  // 1. Check if this is the new OCT Foot Measurement Record format (e.g. KYLE OCT.xlsx)
+  const isKyleFormat = rawData.some(row =>
+    row && typeof row[0] === 'string' &&
+    (row[0].includes('OCT FOOT MEASUREMENT') || row[0].toLowerCase().includes('participant') || row[0].toLowerCase().startsWith('protocol'))
+  );
+
+  if (isKyleFormat) {
+    return parseKyleProtocolRecord(rawData);
+  }
 
   const subjectSections = [];
 

@@ -7,6 +7,7 @@ import sys
 import os
 import json
 import argparse
+import re
 import numpy as np
 
 # Ensure root directory is on Python path to access core module
@@ -126,9 +127,119 @@ def parse_microcirculation_excel(file_path: str):
 def parse_myoton_excel(file_path: str):
     import pandas as pd
     df = pd.read_excel(file_path, header=None)
-    # Subject 1 (Bas): rows 3-11 (0-indexed 3..11)
-    # Subject 2 (Cornel): rows 13-21
-    # Subject 3 (Reuben): rows 23-31
+
+    # 1. Check if this is the new OCT Foot Record format (e.g. KYLE OCT.xlsx)
+    first_cells = [str(df.iloc[r, 0]) for r in range(min(10, len(df))) if pd.notna(df.iloc[r, 0])]
+    is_kyle = any('OCT FOOT MEASUREMENT' in c or 'Participant' in c or 'Protocol' in c for c in first_cells)
+
+    if is_kyle:
+        participant = 'KYLE'
+        protocols = []
+        current_date = None
+
+        for r in range(len(df)):
+            c0 = df.iloc[r, 0]
+            c0_str = str(c0).strip() if pd.notna(c0) else ''
+
+            if 'participant' in c0_str.lower():
+                parts = c0_str.split(':')
+                if len(parts) > 1 and parts[1].strip():
+                    participant = parts[1].strip()
+
+            if 'date' in c0_str.lower():
+                d_val = df.iloc[r, 1] if df.shape[1] > 1 else None
+                current_date = str(d_val) if pd.notna(d_val) else c0_str
+
+            if c0_str.lower().startswith('protocol'):
+                m_proto = re.search(r'protocol\s*(\d+)', c0_str, re.I)
+                proto_num = int(m_proto.group(1)) if m_proto else len(protocols) + 1
+
+                m_freq = re.search(r'frequency:\s*([\d.]+)\s*hz', c0_str, re.I)
+                freq_str = (m_freq.group(1) + 'Hz') if m_freq else 'Unknown'
+
+                m_int = re.search(r'intensity:\s*([\d.]+)%?', c0_str, re.I)
+                int_str = (m_int.group(1) + '%') if m_int else 'Unknown'
+
+                foot_cell = df.iloc[r + 1, 0] if r + 1 < len(df) else None
+                foot_str = str(foot_cell).strip() if pd.notna(foot_cell) else 'Unknown Foot'
+
+                pts = {}
+                for p_idx in range(1, 10):
+                    data_r = r + 3 + p_idx
+                    if data_r >= len(df):
+                        continue
+
+                    e1_be = float(df.iloc[data_r, 1]) if pd.notna(df.iloc[data_r, 1]) else 0.0
+                    e2_be = float(df.iloc[data_r, 2]) if pd.notna(df.iloc[data_r, 2]) else 0.0
+                    e3_be = float(df.iloc[data_r, 3]) if pd.notna(df.iloc[data_r, 3]) else 0.0
+
+                    e1_af = float(df.iloc[data_r, 5]) if pd.notna(df.iloc[data_r, 5]) else 0.0
+                    e2_af = float(df.iloc[data_r, 6]) if pd.notna(df.iloc[data_r, 6]) else 0.0
+                    e3_af = float(df.iloc[data_r, 7]) if pd.notna(df.iloc[data_r, 7]) else 0.0
+
+                    m_be = round((e1_be + e2_be + e3_be) / 3.0, 1)
+                    m_af = round((e1_af + e2_af + e3_af) / 3.0, 1)
+                    d = round(m_af - m_be, 1)
+
+                    pts[p_idx] = {
+                        'pointId': p_idx,
+                        'before': m_be,
+                        'after': m_af,
+                        'delta': d,
+                        'triplicatesBefore': [e1_be, e2_be, e3_be],
+                        'triplicatesAfter': [e1_af, e2_af, e3_af]
+                    }
+
+                protocols.append({
+                    'protocolNum': proto_num,
+                    'name': f'Protocol {proto_num}: {freq_str} {int_str} ({foot_str})',
+                    'frequency': freq_str,
+                    'intensity': int_str,
+                    'foot': foot_str,
+                    'date': current_date,
+                    'points': pts
+                })
+
+        myoton_data = {}
+        standard_points = {}
+        for p_idx in range(1, 10):
+            cp = COMPASS_POINTS[p_idx - 1]
+            freqs = {}
+            for p in protocols:
+                pt = p['points'].get(p_idx, {})
+                freqs[p['name']] = {'before': pt.get('before', 0.0), 'after': pt.get('after', 0.0), 'delta': pt.get('delta', 0.0)}
+
+            p1_pt = protocols[0]['points'].get(p_idx, {}) if len(protocols) > 0 else {}
+            p50_matches = [p for p in protocols if '50' in p['frequency']]
+            p50_pt = p50_matches[0]['points'].get(p_idx, {}) if len(p50_matches) > 0 else p1_pt
+
+            freqs['1Hz'] = {'before': p1_pt.get('before', 0.0), 'after': p1_pt.get('after', 0.0), 'delta': p1_pt.get('delta', 0.0)}
+            freqs['50Hz'] = {'before': p50_pt.get('before', 0.0), 'after': p50_pt.get('after', 0.0), 'delta': p50_pt.get('delta', 0.0)}
+            freqs['30Hz'] = freqs['1Hz']
+            freqs['100Hz'] = freqs['50Hz']
+
+            standard_points[p_idx] = {
+                'pointId': p_idx,
+                'compassName': cp['name'],
+                'compassCode': cp['code'],
+                'gridRow': cp['row'],
+                'gridCol': cp['col'],
+                'frequencies': freqs
+            }
+
+        s_data = {
+            'id': 1,
+            'name': participant,
+            'isProtocolFormat': True,
+            'protocols': protocols,
+            'points': standard_points
+        }
+        myoton_data[participant] = s_data
+        myoton_data[1] = s_data
+        myoton_data['ALL'] = s_data
+        return myoton_data
+
+    # 2. Standard / Legacy Subject-block format
     subject_ranges = [
         (1, "Bas", 3),
         (2, "Cornel", 13),
