@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import CompassHeatmap from './CompassHeatmap';
 import { COMPASS_POINTS } from '../utils/excelParser';
-import { mean } from '../utils/statistics';
+import { mean, median } from '../utils/statistics';
 import { downloadMyotonTemplate } from '../utils/templateGenerator';
 
 export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
@@ -26,6 +26,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
   const [selectedSubjectKey, setSelectedSubjectKey] = useState('ALL');
   const [selectedFreq, setSelectedFreq] = useState('30Hz');
   const [showTriplicates, setShowTriplicates] = useState(false);
+  const [aggregationMethod, setAggregationMethod] = useState('mean'); // 'mean' | 'median'
 
   // Active target subject object
   const targetSubj = useMemo(() => {
@@ -71,9 +72,23 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
       const pt = targetSubj.points[pIdx];
       const freqObj = pt?.frequencies?.[selectedFreq] || Object.values(pt?.frequencies || {})[0] || { before: 0, after: 0, delta: 0 };
 
-      const sb = freqObj.before || 0;
-      const sa = freqObj.after || 0;
-      const ds = Number((sa - sb).toFixed(1));
+      // Determine stiffness based on aggregationMethod
+      let sb = freqObj.before || 0;
+      let sa = freqObj.after || 0;
+      let ds = Number((sa - sb).toFixed(1));
+
+      if (aggregationMethod === 'median') {
+        if (freqObj.medianBefore !== undefined) sb = freqObj.medianBefore;
+        if (freqObj.medianAfter !== undefined) sa = freqObj.medianAfter;
+        if (freqObj.medianDelta !== undefined) ds = freqObj.medianDelta;
+        else ds = Number((sa - sb).toFixed(1));
+      } else {
+        if (freqObj.meanBefore !== undefined) sb = freqObj.meanBefore;
+        if (freqObj.meanAfter !== undefined) sa = freqObj.meanAfter;
+        if (freqObj.meanDelta !== undefined) ds = freqObj.meanDelta;
+        else ds = Number((sa - sb).toFixed(1));
+      }
+
       const pct = sb > 0 ? Number(((ds / sb) * 100).toFixed(1)) : 0;
 
       beforeList.push(sb);
@@ -92,8 +107,14 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
         stiffChangePct: pct,
         beforeStd: freqObj.beforeStd || 0,
         afterStd: freqObj.afterStd || 0,
+        meanBefore: freqObj.meanBefore ?? freqObj.before,
+        meanAfter: freqObj.meanAfter ?? freqObj.after,
+        medianBefore: freqObj.medianBefore ?? freqObj.before,
+        medianAfter: freqObj.medianAfter ?? freqObj.after,
         triplicatesBefore: freqObj.triplicatesBefore || null,
         triplicatesAfter: freqObj.triplicatesAfter || null,
+        sortedTriplicatesBefore: freqObj.sortedTriplicatesBefore || null,
+        sortedTriplicatesAfter: freqObj.sortedTriplicatesAfter || null,
         t1Before: targetSubj.t1?.[pIdx]?.before || 0,
         t1After: targetSubj.t1?.[pIdx]?.after || 0,
         m1Before: targetSubj.m1?.[pIdx]?.before || 0,
@@ -101,21 +122,22 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
       });
     }
 
-    const meanBe = Number(mean(beforeList).toFixed(1));
-    const meanAf = Number(mean(afterList).toFixed(1));
-    const meanD = Number(mean(deltaList).toFixed(1));
-    const overallPct = meanBe > 0 ? Number(((meanD / meanBe) * 100).toFixed(1)) : 0;
+    const overallBe = aggregationMethod === 'median' ? Number(median(beforeList).toFixed(1)) : Number(mean(beforeList).toFixed(1));
+    const overallAf = aggregationMethod === 'median' ? Number(median(afterList).toFixed(1)) : Number(mean(afterList).toFixed(1));
+    const overallD = aggregationMethod === 'median' ? Number(median(deltaList).toFixed(1)) : Number(mean(deltaList).toFixed(1));
+    const overallPct = overallBe > 0 ? Number(((overallD / overallBe) * 100).toFixed(1)) : 0;
 
     return {
       title: isGroup ? `All Subjects Group Average (N = ${subjectList.length || 3})` : `Subject: ${targetSubj.name}`,
       isGroup,
       cells,
-      meanBefore: meanBe,
-      meanAfter: meanAf,
-      meanDelta: meanD,
+      aggregationMethod,
+      meanBefore: overallBe,
+      meanAfter: overallAf,
+      meanDelta: overallD,
       overallPct
     };
-  }, [targetSubj, selectedSubjectKey, selectedFreq, subjectList]);
+  }, [targetSubj, selectedSubjectKey, selectedFreq, subjectList, aggregationMethod]);
 
   return (
     <div className="space-y-6">
@@ -169,7 +191,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
         </div>
 
         {/* Control Parameters */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4 text-xs">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-4 text-xs">
           <div>
             <label className="block text-gray-700 font-semibold mb-1">Subject / Participant</label>
             <select
@@ -212,6 +234,41 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
               )}
             </select>
           </div>
+
+          <div>
+            <label className="block text-gray-700 font-semibold mb-1 flex items-center justify-between">
+              <span>Triplicate Estimator</span>
+              <span className="text-[10px] font-semibold text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-200">
+                {aggregationMethod === 'median' ? 'Middle Value' : 'Arithmetic Mean'}
+              </span>
+            </label>
+            <div className="grid grid-cols-2 gap-1 bg-gray-100 p-1 rounded-lg border border-gray-200">
+              <button
+                type="button"
+                onClick={() => setAggregationMethod('mean')}
+                className={`py-1.5 px-2 rounded-md text-xs font-semibold transition-all cursor-pointer text-center ${
+                  aggregationMethod === 'mean'
+                    ? 'bg-white text-indigo-700 shadow-2xs border border-gray-200'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+                title="Mean: Arithmetic average of triplicates (E1 + E2 + E3) / 3"
+              >
+                Mean (Average)
+              </button>
+              <button
+                type="button"
+                onClick={() => setAggregationMethod('median')}
+                className={`py-1.5 px-2 rounded-md text-xs font-semibold transition-all cursor-pointer text-center ${
+                  aggregationMethod === 'median'
+                    ? 'bg-white text-indigo-700 shadow-2xs border border-gray-200'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+                title="Median: Middle value of triplicates (n > min & n < max)"
+              >
+                Median (Nilai Tengah)
+              </button>
+            </div>
+          </div>
         </div>
 
         {/* Active Protocol Context Card (If in Protocol Format) */}
@@ -231,6 +288,9 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
               </span>
               <span className="font-semibold text-slate-800">
                 Intensity: <span className="font-mono text-amber-700">{activeProtocol.intensity}</span>
+              </span>
+              <span className="font-semibold text-slate-800">
+                Estimator: <span className="font-mono text-emerald-700 font-bold">{aggregationMethod === 'median' ? 'Median (Middle Value)' : 'Mean (Average)'}</span>
               </span>
               {activeProtocol.date && (
                 <span className="hidden sm:inline-flex items-center gap-1 text-slate-500 text-[11px]">
@@ -263,23 +323,33 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
           {/* Summary Metric Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-xs">
-              <span className="text-[11px] font-semibold uppercase text-gray-500">Baseline Stiffness (Before)</span>
+              <span className="text-[11px] font-semibold uppercase text-gray-500">
+                {aggregationMethod === 'median' ? 'Baseline Stiffness (Median)' : 'Baseline Stiffness (Mean)'}
+              </span>
               <div className="text-2xl font-black text-gray-900 mt-2">
                 {myotonAnalysis.meanBefore} <span className="text-xs text-gray-500 font-normal">N/m</span>
               </div>
-              <p className="text-[10px] text-gray-400 mt-1">Pre-stimulation resting stiffness</p>
+              <p className="text-[10px] text-gray-400 mt-1">
+                {aggregationMethod === 'median' ? 'Pre-stimulus median of 9 points' : 'Pre-stimulation resting stiffness'}
+              </p>
             </div>
 
             <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-xs">
-              <span className="text-[11px] font-semibold uppercase text-gray-500">Post-Stimulus Stiffness (After)</span>
+              <span className="text-[11px] font-semibold uppercase text-gray-500">
+                {aggregationMethod === 'median' ? 'Post-Stimulus Stiffness (Median)' : 'Post-Stimulus Stiffness (Mean)'}
+              </span>
               <div className="text-2xl font-black text-indigo-600 mt-2">
                 {myotonAnalysis.meanAfter} <span className="text-xs text-gray-500 font-normal">N/m</span>
               </div>
-              <p className="text-[10px] text-gray-400 mt-1">Post-stimulation tissue tone</p>
+              <p className="text-[10px] text-gray-400 mt-1">
+                {aggregationMethod === 'median' ? 'Post-stimulus median of 9 points' : 'Post-stimulation tissue tone'}
+              </p>
             </div>
 
             <div className="bg-white p-5 rounded-xl border border-gray-200 shadow-xs">
-              <span className="text-[11px] font-semibold uppercase text-gray-500">Mean Δ Stiffness</span>
+              <span className="text-[11px] font-semibold uppercase text-gray-500">
+                {aggregationMethod === 'median' ? 'Median Δ Stiffness' : 'Mean Δ Stiffness'}
+              </span>
               <div className="text-2xl font-black text-amber-600 mt-2">
                 {myotonAnalysis.meanDelta >= 0 ? `+${myotonAnalysis.meanDelta}` : myotonAnalysis.meanDelta} <span className="text-xs text-gray-500 font-normal">N/m</span>
               </div>
@@ -298,8 +368,8 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
           {/* 3x3 Spatial Heatmap */}
           <div className="bg-white rounded-xl shadow-xs border border-gray-200 p-5">
             <CompassHeatmap
-              title={`Δ Myoton Tissue Stiffness (${selectedFreq})`}
-              subtitle={`Spatial 3×3 matrix mapping sites 1 to 9 (Snake sequence)`}
+              title={`Δ Myoton Tissue Stiffness (${selectedFreq}) • [${aggregationMethod === 'median' ? 'Median / Nilai Tengah' : 'Mean / Average'}]`}
+              subtitle={`Spatial 3×3 matrix mapping sites 1 to 9 (${aggregationMethod === 'median' ? 'Triplicate Middle Value: n>min & n<max' : 'Triplicate Arithmetic Mean'})`}
               metricName="Stiffness"
               unit="N/m"
               dataCells={myotonAnalysis.cells}
@@ -315,7 +385,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                   9-Point Plantar Compass Coordinates ({selectedFreq})
                 </h3>
                 <p className="text-xs text-gray-500">
-                  {myotonAnalysis.title} • Units: Dynamic Stiffness (N/m)
+                  {myotonAnalysis.title} • Units: Dynamic Stiffness (N/m) • Estimator: {aggregationMethod === 'median' ? 'Median (Middle Value)' : 'Mean (Average)'}
                 </p>
               </div>
             </div>
@@ -328,12 +398,14 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                     <th className="py-2.5 px-4">Compass Direction</th>
                     <th className="py-2.5 px-4">Grid Pos</th>
                     <th className="py-2.5 px-4 text-right">
-                      {showTriplicates ? 'Stiff Before [Mean ± SD]' : 'Stiff Before (N/m)'}
+                      {aggregationMethod === 'median' ? 'Stiff Before [Median]' : showTriplicates ? 'Stiff Before [Mean ± SD]' : 'Stiff Before (N/m)'}
                     </th>
                     <th className="py-2.5 px-4 text-right">
-                      {showTriplicates ? 'Stiff After [Mean ± SD]' : 'Stiff After (N/m)'}
+                      {aggregationMethod === 'median' ? 'Stiff After [Median]' : showTriplicates ? 'Stiff After [Mean ± SD]' : 'Stiff After (N/m)'}
                     </th>
-                    <th className="py-2.5 px-4 text-right font-bold">Δ Stiff (N/m)</th>
+                    <th className="py-2.5 px-4 text-right font-bold">
+                      {aggregationMethod === 'median' ? 'Median Δ Stiff (N/m)' : 'Mean Δ Stiff (N/m)'}
+                    </th>
                     <th className="py-2.5 px-4 text-right font-bold">% Change</th>
                     {showTriplicates ? (
                       <>
@@ -362,7 +434,9 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                         Row {c.row + 1}, Col {c.col + 1}
                       </td>
                       <td className="py-2 px-4 text-right font-mono text-gray-700">
-                        {showTriplicates && c.beforeStd > 0 ? (
+                        {aggregationMethod === 'median' ? (
+                          <span className="font-bold text-slate-800">{c.stiffBefore}</span>
+                        ) : showTriplicates && c.beforeStd > 0 ? (
                           <span>
                             <span className="font-bold">{c.stiffBefore}</span>
                             <span className="text-[10px] text-gray-400 ml-1">±{c.beforeStd}</span>
@@ -372,7 +446,9 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                         )}
                       </td>
                       <td className="py-2 px-4 text-right font-mono text-gray-700">
-                        {showTriplicates && c.afterStd > 0 ? (
+                        {aggregationMethod === 'median' ? (
+                          <span className="font-bold text-indigo-700">{c.stiffAfter}</span>
+                        ) : showTriplicates && c.afterStd > 0 ? (
                           <span>
                             <span className="font-bold text-indigo-700">{c.stiffAfter}</span>
                             <span className="text-[10px] text-gray-400 ml-1">±{c.afterStd}</span>
@@ -390,10 +466,28 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                       {showTriplicates ? (
                         <>
                           <td className="py-2 px-4 text-right font-mono text-gray-600 text-[10px]">
-                            {c.triplicatesBefore ? `[${c.triplicatesBefore.join(', ')}]` : '-'}
+                            {c.triplicatesBefore ? (
+                              <span>
+                                [{c.triplicatesBefore.join(', ')}]
+                                {aggregationMethod === 'median' && c.medianBefore !== undefined && (
+                                  <span className="ml-1 text-emerald-600 font-bold" title="Middle Value: n > min & n < max">
+                                    (Mid: {c.medianBefore})
+                                  </span>
+                                )}
+                              </span>
+                            ) : '-'}
                           </td>
                           <td className="py-2 px-4 text-right font-mono text-indigo-600 text-[10px]">
-                            {c.triplicatesAfter ? `[${c.triplicatesAfter.join(', ')}]` : '-'}
+                            {c.triplicatesAfter ? (
+                              <span>
+                                [{c.triplicatesAfter.join(', ')}]
+                                {aggregationMethod === 'median' && c.medianAfter !== undefined && (
+                                  <span className="ml-1 text-emerald-600 font-bold" title="Middle Value: n > min & n < max">
+                                    (Mid: {c.medianAfter})
+                                  </span>
+                                )}
+                              </span>
+                            ) : '-'}
                           </td>
                         </>
                       ) : (

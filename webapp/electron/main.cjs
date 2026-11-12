@@ -33,7 +33,7 @@ function createWindow() {
     height: 880,
     minWidth: 1080,
     minHeight: 700,
-    title: "Microcirculation (SBF) & Myoton Research Suite",
+    title: "Microcirculation (SBF) & Myoton Research Suite v2.7.0",
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       nodeIntegration: false,

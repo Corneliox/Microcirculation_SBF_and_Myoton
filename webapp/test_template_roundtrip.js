@@ -47,9 +47,14 @@ console.log(`[PASS] Verified 6 clinical protocols:`);
 kyle.protocols.forEach(p => console.log(`   - ${p.name}`));
 
 const pt1 = kyle.protocols[0].points[1];
-console.log(`[PASS] Point 1: Before=${pt1.before}, After=${pt1.after}, Delta=${pt1.delta}`);
+console.log(`[PASS] Point 1: Mean Before=${pt1.before}, Mean After=${pt1.after}, Mean Delta=${pt1.delta}`);
+console.log(`[PASS] Point 1: Median Before=${pt1.medianBefore}, Median After=${pt1.medianAfter}, Median Delta=${pt1.medianDelta}`);
 if (Math.abs(pt1.before - 808.7) > 0.2 || Math.abs(pt1.after - 823.0) > 0.2) {
   console.error('[FAIL] Point 1 mean values mismatch');
+  process.exit(1);
+}
+if (Math.abs(pt1.medianBefore - 814.0) > 0.2 || Math.abs(pt1.medianAfter - 826.0) > 0.2 || Math.abs(pt1.medianDelta - 12.0) > 0.2) {
+  console.error('[FAIL] Point 1 median values mismatch');
   process.exit(1);
 }
 

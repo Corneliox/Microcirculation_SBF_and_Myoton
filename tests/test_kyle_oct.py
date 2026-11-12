@@ -38,13 +38,19 @@ class TestKyleOCTAdapter(unittest.TestCase):
         self.assertIn("LEFT", p1["foot"].upper())
 
         # Verify Point 1 values for Protocol 1:
-        # Before: [816, 814, 796] -> mean = 808.7
-        # After: [793, 826, 850] -> mean = 823.0
-        # Delta = 823.0 - 808.7 = 14.3
+        # Before: [816, 814, 796] -> mean = 808.7, median (middle) = 814.0
+        # After: [793, 826, 850] -> mean = 823.0, median (middle) = 826.0
+        # Mean Delta = 823.0 - 808.7 = 14.3
+        # Median Delta = 826.0 - 814.0 = 12.0
         pt1 = p1["points"][1]
         self.assertAlmostEqual(pt1["before"], 808.7, places=1)
         self.assertAlmostEqual(pt1["after"], 823.0, places=1)
         self.assertAlmostEqual(pt1["delta"], 14.3, places=1)
+        self.assertAlmostEqual(pt1["meanBefore"], 808.7, places=1)
+        self.assertAlmostEqual(pt1["meanAfter"], 823.0, places=1)
+        self.assertAlmostEqual(pt1["medianBefore"], 814.0, places=1)
+        self.assertAlmostEqual(pt1["medianAfter"], 826.0, places=1)
+        self.assertAlmostEqual(pt1["medianDelta"], 12.0, places=1)
         self.assertEqual(pt1["triplicatesBefore"], [816.0, 814.0, 796.0])
         self.assertEqual(pt1["triplicatesAfter"], [793.0, 826.0, 850.0])
 

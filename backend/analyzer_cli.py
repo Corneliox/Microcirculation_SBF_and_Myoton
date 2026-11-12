@@ -182,17 +182,32 @@ def parse_myoton_excel(file_path: str):
                         e2_af = float(df.iloc[data_r, 6]) if pd.notna(df.iloc[data_r, 6]) else 0.0
                         e3_af = float(df.iloc[data_r, 7]) if pd.notna(df.iloc[data_r, 7]) else 0.0
 
+                        be_arr = [e1_be, e2_be, e3_be]
+                        af_arr = [e1_af, e2_af, e3_af]
+
+                        # 1. Mean (Average)
                         m_be = round((e1_be + e2_be + e3_be) / 3.0, 1)
                         m_af = round((e1_af + e2_af + e3_af) / 3.0, 1)
                         d = round(m_af - m_be, 1)
+
+                        # 2. Median (Middle Value: n > min & n < max)
+                        med_be = round(float(np.median(be_arr)), 1)
+                        med_af = round(float(np.median(af_arr)), 1)
+                        med_d = round(med_af - med_be, 1)
 
                         pts[p_idx] = {
                             'pointId': p_idx,
                             'before': m_be,
                             'after': m_af,
                             'delta': d,
-                            'triplicatesBefore': [e1_be, e2_be, e3_be],
-                            'triplicatesAfter': [e1_af, e2_af, e3_af]
+                            'meanBefore': m_be,
+                            'meanAfter': m_af,
+                            'meanDelta': d,
+                            'medianBefore': med_be,
+                            'medianAfter': med_af,
+                            'medianDelta': med_d,
+                            'triplicatesBefore': be_arr,
+                            'triplicatesAfter': af_arr
                         }
 
                     protocols.append({
@@ -211,14 +226,41 @@ def parse_myoton_excel(file_path: str):
                 freqs = {}
                 for p in protocols:
                     pt = p['points'].get(p_idx, {})
-                    freqs[p['name']] = {'before': pt.get('before', 0.0), 'after': pt.get('after', 0.0), 'delta': pt.get('delta', 0.0)}
+                    freqs[p['name']] = {
+                        'before': pt.get('before', 0.0),
+                        'after': pt.get('after', 0.0),
+                        'delta': pt.get('delta', 0.0),
+                        'meanBefore': pt.get('meanBefore', pt.get('before', 0.0)),
+                        'meanAfter': pt.get('meanAfter', pt.get('after', 0.0)),
+                        'meanDelta': pt.get('meanDelta', pt.get('delta', 0.0)),
+                        'medianBefore': pt.get('medianBefore', pt.get('before', 0.0)),
+                        'medianAfter': pt.get('medianAfter', pt.get('after', 0.0)),
+                        'medianDelta': pt.get('medianDelta', pt.get('delta', 0.0)),
+                        'triplicatesBefore': pt.get('triplicatesBefore', []),
+                        'triplicatesAfter': pt.get('triplicatesAfter', [])
+                    }
 
                 p1_pt = protocols[0]['points'].get(p_idx, {}) if len(protocols) > 0 else {}
                 p50_matches = [p for p in protocols if '50' in p['frequency']]
                 p50_pt = p50_matches[0]['points'].get(p_idx, {}) if len(p50_matches) > 0 else p1_pt
 
-                freqs['1Hz'] = {'before': p1_pt.get('before', 0.0), 'after': p1_pt.get('after', 0.0), 'delta': p1_pt.get('delta', 0.0)}
-                freqs['50Hz'] = {'before': p50_pt.get('before', 0.0), 'after': p50_pt.get('after', 0.0), 'delta': p50_pt.get('delta', 0.0)}
+                def make_freq_dict(src):
+                    return {
+                        'before': src.get('before', 0.0),
+                        'after': src.get('after', 0.0),
+                        'delta': src.get('delta', 0.0),
+                        'meanBefore': src.get('meanBefore', src.get('before', 0.0)),
+                        'meanAfter': src.get('meanAfter', src.get('after', 0.0)),
+                        'meanDelta': src.get('meanDelta', src.get('delta', 0.0)),
+                        'medianBefore': src.get('medianBefore', src.get('before', 0.0)),
+                        'medianAfter': src.get('medianAfter', src.get('after', 0.0)),
+                        'medianDelta': src.get('medianDelta', src.get('delta', 0.0)),
+                        'triplicatesBefore': src.get('triplicatesBefore', []),
+                        'triplicatesAfter': src.get('triplicatesAfter', [])
+                    }
+
+                freqs['1Hz'] = make_freq_dict(p1_pt)
+                freqs['50Hz'] = make_freq_dict(p50_pt)
                 freqs['30Hz'] = freqs['1Hz']
                 freqs['100Hz'] = freqs['50Hz']
 

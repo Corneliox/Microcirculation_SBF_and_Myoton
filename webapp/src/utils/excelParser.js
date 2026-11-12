@@ -16,7 +16,7 @@
  */
 
 import * as XLSX from 'xlsx';
-import { calculateDwellValue, mean, std, pairedTTest, oneWayAnova, spearmanCorrelation, pearsonCorrelation } from './statistics.js';
+import { calculateDwellValue, mean, median, std, pairedTTest, oneWayAnova, spearmanCorrelation, pearsonCorrelation } from './statistics.js';
 
 export const COMPASS_POINTS = [
   { id: 1, name: 'North-West (NW)', code: 'NW', row: 0, col: 0 },
@@ -196,12 +196,21 @@ export function parseKyleProtocolRecord(rawData) {
         const e2Af = parseFloat(dRow[6]) || 0;
         const e3Af = parseFloat(dRow[7]) || 0;
 
+        const beArr = [e1Be, e2Be, e3Be];
+        const afArr = [e1Af, e2Af, e3Af];
+
+        // 1. Mean (Average)
         const meanBe = Number(((e1Be + e2Be + e3Be) / 3.0).toFixed(1));
         const meanAf = Number(((e1Af + e2Af + e3Af) / 3.0).toFixed(1));
         const delta = Number((meanAf - meanBe).toFixed(1));
 
-        const beArr = [e1Be, e2Be, e3Be];
-        const afArr = [e1Af, e2Af, e3Af];
+        // 2. Median (Middle Value: n > min & n < max)
+        const sortedBe = beArr.slice().sort((a, b) => a - b);
+        const sortedAf = afArr.slice().sort((a, b) => a - b);
+        const medianBe = Number(sortedBe[1].toFixed(1));
+        const medianAf = Number(sortedAf[1].toFixed(1));
+        const medianDelta = Number((medianAf - medianBe).toFixed(1));
+
         const beStd = Number(std(beArr).toFixed(1));
         const afStd = Number(std(afArr).toFixed(1));
         const beCv = meanBe > 0 ? Number(((beStd / meanBe) * 100).toFixed(1)) : 0;
@@ -216,13 +225,22 @@ export function parseKyleProtocolRecord(rawData) {
           before: meanBe,
           after: meanAf,
           delta: delta,
+          meanBefore: meanBe,
+          meanAfter: meanAf,
+          meanDelta: delta,
+          medianBefore: medianBe,
+          medianAfter: medianAf,
+          medianDelta: medianDelta,
           stiffChangePct: meanBe > 0 ? Number(((delta / meanBe) * 100).toFixed(1)) : 0,
+          medianStiffChangePct: medianBe > 0 ? Number(((medianDelta / medianBe) * 100).toFixed(1)) : 0,
           beforeStd: beStd,
           afterStd: afStd,
           beforeCv: beCv,
           afterCv: afCv,
           triplicatesBefore: [e1Be, e2Be, e3Be],
-          triplicatesAfter: [e1Af, e2Af, e3Af]
+          triplicatesAfter: [e1Af, e2Af, e3Af],
+          sortedTriplicatesBefore: sortedBe,
+          sortedTriplicatesAfter: sortedAf
         };
       }
 
@@ -254,8 +272,16 @@ export function parseKyleProtocolRecord(rawData) {
           before: pt.before,
           after: pt.after,
           delta: pt.delta,
+          meanBefore: pt.meanBefore,
+          meanAfter: pt.meanAfter,
+          meanDelta: pt.meanDelta,
+          medianBefore: pt.medianBefore,
+          medianAfter: pt.medianAfter,
+          medianDelta: pt.medianDelta,
           triplicatesBefore: pt.triplicatesBefore,
           triplicatesAfter: pt.triplicatesAfter,
+          sortedTriplicatesBefore: pt.sortedTriplicatesBefore,
+          sortedTriplicatesAfter: pt.sortedTriplicatesAfter,
           beforeStd: pt.beforeStd,
           afterStd: pt.afterStd
         };
@@ -265,11 +291,43 @@ export function parseKyleProtocolRecord(rawData) {
 
     const p1Pt = protocols.find(p => p.frequency.includes('1'))?.points[pIdx];
     if (p1Pt) {
-      freqs['1Hz'] = { before: p1Pt.before, after: p1Pt.after, delta: p1Pt.delta };
+      freqs['1Hz'] = {
+        before: p1Pt.before,
+        after: p1Pt.after,
+        delta: p1Pt.delta,
+        meanBefore: p1Pt.meanBefore,
+        meanAfter: p1Pt.meanAfter,
+        meanDelta: p1Pt.meanDelta,
+        medianBefore: p1Pt.medianBefore,
+        medianAfter: p1Pt.medianAfter,
+        medianDelta: p1Pt.medianDelta,
+        triplicatesBefore: p1Pt.triplicatesBefore,
+        triplicatesAfter: p1Pt.triplicatesAfter,
+        sortedTriplicatesBefore: p1Pt.sortedTriplicatesBefore,
+        sortedTriplicatesAfter: p1Pt.sortedTriplicatesAfter,
+        beforeStd: p1Pt.beforeStd,
+        afterStd: p1Pt.afterStd
+      };
     }
     const p50Pt = protocols.find(p => p.frequency.includes('50'))?.points[pIdx];
     if (p50Pt) {
-      freqs['50Hz'] = { before: p50Pt.before, after: p50Pt.after, delta: p50Pt.delta };
+      freqs['50Hz'] = {
+        before: p50Pt.before,
+        after: p50Pt.after,
+        delta: p50Pt.delta,
+        meanBefore: p50Pt.meanBefore,
+        meanAfter: p50Pt.meanAfter,
+        meanDelta: p50Pt.meanDelta,
+        medianBefore: p50Pt.medianBefore,
+        medianAfter: p50Pt.medianAfter,
+        medianDelta: p50Pt.medianDelta,
+        triplicatesBefore: p50Pt.triplicatesBefore,
+        triplicatesAfter: p50Pt.triplicatesAfter,
+        sortedTriplicatesBefore: p50Pt.sortedTriplicatesBefore,
+        sortedTriplicatesAfter: p50Pt.sortedTriplicatesAfter,
+        beforeStd: p50Pt.beforeStd,
+        afterStd: p50Pt.afterStd
+      };
     }
     if (!freqs['30Hz']) {
       freqs['30Hz'] = freqs['1Hz'] || (defaultProto ? defaultProto.points[pIdx] : { before: 0, after: 0, delta: 0 });
