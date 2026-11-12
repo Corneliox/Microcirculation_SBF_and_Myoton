@@ -1,0 +1,7 @@
+Subject,ProtocolNum,ProtocolName,Frequency,Intensity,Foot,Stiff_Max_After,Stiff_Min_After,Stiff_Mean_After,Stiff_Median_After,Grad_Max_After,Grad_Min_After,Grad_Mean_After,Grad_Median_After,Direction_Modus_After
+KYLE,1,Protocol 1: 1Hz 30% (LEFT FOOT),1Hz,30%,LEFT FOOT,823.0,515.7,659.3,626.3,48.6,5.1,24.7,24.1,W
+KYLE,2,Protocol 2: 1Hz 50% (RIGHT FOOT),1Hz,50%,RIGHT FOOT,940.0,582.0,777.7,820.7,75.4,0.9,39.6,41.5,S
+KYLE,3,Protocol 3: 1Hz 80% (LEFT FOOT),1Hz,80%,LEFT FOOT,765.3,552.0,650.2,661.7,42.9,7.3,17.0,16.0,W
+KYLE,4,Protocol 4: 50Hz 30% (RIGHT FOOT),50Hz,30%,RIGHT FOOT,960.7,607.0,796.0,783.0,72.4,1.2,33.5,32.5,N
+KYLE,5,Protocol 5: 50Hz 50% (LEFT FOOT),50Hz,50%,LEFT FOOT,770.3,487.3,603.0,579.7,46.9,0.3,20.6,17.9,NW
+KYLE,6,Protocol 6: 50Hz 80% (RIGHT FOOT),50Hz,80%,RIGHT FOOT,971.0,619.0,811.0,889.7,70.3,0.9,33.4,31.4,S

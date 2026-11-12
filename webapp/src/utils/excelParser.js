@@ -143,11 +143,180 @@ export function parseMicrocirculationWorkbook(workbook) {
 }
 
 /**
+ * Exhaustive Validator for Myoton OCT Foot Measurement Workbooks.
+ * Maps all potential format states, formula errors, partial protocols, and anomalies.
+ */
+export function validateOctWorkbook(rawData) {
+  if (!rawData || !Array.isArray(rawData) || rawData.length < 5) {
+    return {
+      status: 'ERROR',
+      badge: 'Format Rusak',
+      color: 'rose',
+      code: 'EMPTY_OR_UNREADABLE',
+      title: 'Berkas Kosong atau Tidak Terbaca',
+      issues: ['File Excel tidak memiliki baris data yang cukup untuk dianalisis.'],
+      recommendation: 'Pastikan file Excel berisi data hasil pengukuran Myoton OCT yang valid.',
+      protocolCount: 0
+    };
+  }
+
+  let hasOctHeader = false;
+  let hasParticipant = false;
+  const protoIndices = [];
+  const foundErrors = [];
+  const outOfRangeValues = [];
+
+  for (let r = 0; r < rawData.length; r++) {
+    const row = rawData[r];
+    if (!row) continue;
+    const c0 = row[0] ? String(row[0]).trim() : '';
+    const c0Lower = c0.toLowerCase();
+
+    if (c0Lower.includes('oct foot measurement') || c0Lower.includes('oct')) {
+      hasOctHeader = true;
+    }
+    if (c0Lower.includes('participant')) {
+      hasParticipant = true;
+    }
+    if (c0Lower.startsWith('protocol')) {
+      protoIndices.push(r);
+    }
+
+    for (let c = 0; c < row.length; c++) {
+      const cellVal = String(row[c] ?? '');
+      if (cellVal.includes('#VALUE!') || cellVal.includes('#REF!') || cellVal.includes('#DIV/0!') || cellVal.includes('#N/A')) {
+        foundErrors.push('Baris ' + (r + 1) + ', Kolom ' + (c + 1) + ': ' + cellVal);
+      }
+    }
+  }
+
+  // Check if completely unrecognizable format
+  if (!hasOctHeader && !hasParticipant && protoIndices.length === 0) {
+    const hasSubject = rawData.some(r => r && typeof r[0] === 'string' && (r[0].toLowerCase().includes('subject') || r[0].toLowerCase().includes('subjek')));
+    if (hasSubject) {
+      return {
+        status: 'WARNING',
+        badge: 'Format Legacy',
+        color: 'amber',
+        code: 'LEGACY_FORMAT',
+        title: 'Format Tabel Subjek Lama (Legacy)',
+        issues: ['File menggunakan format Subject 9-point lama, bukan format OCT Protokol Standar.'],
+        recommendation: 'Gunakan template OCT Foot Measurement Record (NewFormat.xlsx) untuk fitur multi-protokol & triplikat lengkap.',
+        protocolCount: 0
+      };
+    }
+
+    return {
+      status: 'UNKNOWN',
+      badge: 'Masalah Tidak Diketahui',
+      color: 'slate',
+      code: 'UNKNOWN_STRUCTURE',
+      title: 'Struktur Berkas Tidak Dikenali',
+      issues: ['File tidak memiliki header OCT, penanda Participant, maupun blok Protocol standar.'],
+      recommendation: 'Unduh template resmi NewFormat.xlsx melalui tombol di aplikasi, lalu salin data pengukuran ke dalamnya.',
+      protocolCount: 0
+    };
+  }
+
+  if (protoIndices.length === 0) {
+    return {
+      status: 'ERROR',
+      badge: 'Format Tidak Sesuai',
+      color: 'rose',
+      code: 'MISSING_PROTOCOLS',
+      title: 'Tidak Ada Blok Protokol Terdeteksi',
+      issues: ['Header ditemukan tetapi tidak ada satupun baris Protocol 1, Protocol 2, dst.'],
+      recommendation: 'Pastikan baris judul protokol diawali kata "Protocol 1", "Protocol 2" hingga "Protocol 6".',
+      protocolCount: 0
+    };
+  }
+
+  // Verify points & triplicates in each protocol
+  const issues = [];
+  let completeProtocols = 0;
+
+  protoIndices.forEach((r, idx) => {
+    let validPointsCount = 0;
+    for (let pIdx = 1; pIdx <= 9; pIdx++) {
+      const dRow = rawData[r + 3 + pIdx];
+      if (dRow) {
+        const e1Be = parseFloat(dRow[1]);
+        const e2Be = parseFloat(dRow[2]);
+        const e3Be = parseFloat(dRow[3]);
+        const e1Af = parseFloat(dRow[5]);
+        const e2Af = parseFloat(dRow[6]);
+        const e3Af = parseFloat(dRow[7]);
+
+        const allNumeric = [e1Be, e2Be, e3Be, e1Af, e2Af, e3Af].every(v => !isNaN(v) && v > 0);
+        if (allNumeric) {
+          validPointsCount++;
+          [e1Be, e2Be, e3Be, e1Af, e2Af, e3Af].forEach(v => {
+            if (v < 30 || v > 3000) {
+              outOfRangeValues.push('Protokol ' + (idx + 1) + ' Titik ' + pIdx + ': Nilai ' + v + ' di luar rentang wajar (30 - 3000)');
+            }
+          });
+        }
+      }
+    }
+    if (validPointsCount === 9) {
+      completeProtocols++;
+    } else {
+      issues.push('Protokol ' + (idx + 1) + ' hanya memiliki ' + validPointsCount + '/9 titik pengukuran terisi lengkap.');
+    }
+  });
+
+  if (foundErrors.length > 0) {
+    return {
+      status: 'ERROR',
+      badge: 'Format Rusak',
+      color: 'rose',
+      code: 'FORMULA_ERRORS',
+      title: 'Terdapat Kesalahan Rumus Excel (#VALUE!, #REF!)',
+      issues: foundErrors.slice(0, 5),
+      recommendation: 'Periksa sel-sel Excel yang rusak di atas dan ganti dengan nilai numerik hasil pengukuran.',
+      protocolCount: protoIndices.length
+    };
+  }
+
+  if (protoIndices.length < 6) {
+    issues.push('Hanya ditemukan ' + protoIndices.length + ' protokol (standar pengujian klinis adalah 6 protokol).');
+  }
+
+  if (outOfRangeValues.length > 0) {
+    issues.push(...outOfRangeValues.slice(0, 3));
+  }
+
+  if (issues.length > 0) {
+    return {
+      status: 'WARNING',
+      badge: 'Peringatan Format',
+      color: 'amber',
+      code: 'INCOMPLETE_DATA',
+      title: 'Format Sesuai Parsial',
+      issues: issues,
+      recommendation: 'Sebagian data titik atau protokol belum lengkap. Anda masih dapat menganalisis data yang tersedia.',
+      protocolCount: protoIndices.length
+    };
+  }
+
+  return {
+    status: 'VALID',
+    badge: 'Format Sesuai',
+    color: 'emerald',
+    code: 'PERFECT_MATCH',
+    title: 'Format OCT Terverifikasi Sempurna',
+    issues: [],
+    recommendation: 'Semua 6 protokol dan 9 titik pengukuran triplikat terverifikasi utuh.',
+    protocolCount: protoIndices.length
+  };
+}
+
+/**
  * Parses new OCT Foot Measurement Record format (e.g. KYLE OCT.xlsx).
  * Supports multi-protocol records (Frequency 1Hz, 50Hz; Intensity 30%, 50%, 80%; Left vs Right foot)
  * with triplicate measurements (E1, E2, E3 Before and After).
  */
-export function parseKyleProtocolRecord(rawData) {
+export function parseKyleProtocolRecord(rawData, fileName = '') {
   let participant = 'KYLE';
   const protocols = [];
   let currentDate = null;
@@ -346,14 +515,18 @@ export function parseKyleProtocolRecord(rawData) {
     };
   }
 
+  const validation = validateOctWorkbook(rawData);
+
   const sData = {
     name: participant,
+    fileName: fileName || `${participant}_OCT.xlsx`,
     id: 1,
     isProtocolFormat: true,
     protocols: protocols,
     availableProtocols: protocols.map(p => p.name),
     availableFrequencies: [...new Set(protocols.map(p => p.frequency))],
     points: standardPoints,
+    validation: validation,
     t1: {},
     m1: {}
   };
@@ -362,28 +535,6 @@ export function parseKyleProtocolRecord(rawData) {
   results[participant] = sData;
   results[1] = sData;
   results['ALL'] = sData;
-
-  const leftProtocols = protocols.filter(p => p.foot.toUpperCase().includes('LEFT'));
-  const rightProtocols = protocols.filter(p => p.foot.toUpperCase().includes('RIGHT'));
-
-  if (leftProtocols.length > 0) {
-    results[`${participant} (LEFT FOOT)`] = {
-      ...sData,
-      name: `${participant} (LEFT FOOT)`,
-      id: 2,
-      protocols: leftProtocols,
-      availableProtocols: leftProtocols.map(p => p.name)
-    };
-  }
-  if (rightProtocols.length > 0) {
-    results[`${participant} (RIGHT FOOT)`] = {
-      ...sData,
-      name: `${participant} (RIGHT FOOT)`,
-      id: 3,
-      protocols: rightProtocols,
-      availableProtocols: rightProtocols.map(p => p.name)
-    };
-  }
 
   return results;
 }
