@@ -44,20 +44,20 @@ function FormatStatusBadge({ validation, onClick }) {
 
   let bgClass = 'bg-slate-50 text-slate-700 border-slate-200';
   let Icon = HelpCircle;
-  let text = '⚪ Masalah Tidak Diketahui';
+  let text = '⚪ Unknown Format Issue';
 
   if (validation.status === 'VALID') {
     bgClass = 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100';
     Icon = CheckCircle2;
-    text = '🟢 Format Sesuai';
+    text = '🟢 Standard Format Verified';
   } else if (validation.status === 'WARNING') {
     bgClass = 'bg-amber-50 text-amber-800 border-amber-300 hover:bg-amber-100';
     Icon = AlertTriangle;
-    text = '🟡 Peringatan Format';
+    text = '🟡 Format Warning';
   } else if (validation.status === 'ERROR') {
     bgClass = 'bg-rose-50 text-rose-800 border-rose-300 hover:bg-rose-100';
     Icon = XCircle;
-    text = '🔴 Format Tidak Sesuai';
+    text = '🔴 Invalid Format';
   }
 
   return (
@@ -68,7 +68,7 @@ function FormatStatusBadge({ validation, onClick }) {
         onClick(validation);
       }}
       className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border transition-all cursor-pointer shadow-2xs ${bgClass}`}
-      title="Klik untuk melihat rincian validasi format & rekomendasi"
+      title="Click to view format validation details and recommendations"
     >
       <Icon className="w-3.5 h-3.5 shrink-0" />
       <span>{text}</span>
@@ -99,10 +99,10 @@ function ValidationDetailsModal({ validation, participantName, onClose }) {
             )}
             <div>
               <h3 className="font-bold text-slate-900 text-sm">
-                Laporan Validasi Format: {participantName}
+                Format Validation Report: {participantName}
               </h3>
               <p className="text-[11px] text-slate-500">
-                Kode Status: <code className="font-mono font-semibold text-slate-700">{validation.code}</code>
+                Status Code: <code className="font-mono font-semibold text-slate-700">{validation.code}</code>
               </p>
             </div>
           </div>
@@ -131,8 +131,8 @@ function ValidationDetailsModal({ validation, participantName, onClose }) {
             <h4 className="font-bold text-xs mb-1">{validation.title}</h4>
             <p className="text-[11px] leading-relaxed">
               {validation.status === 'VALID'
-                ? 'Struktur berkas Myoton OCT sesuai dengan spesifikasi klinis 6 protokol bilateral dan 9 titik kompas triplikat.'
-                : 'Ditemukan beberapa ketidaksesuaian format yang memerlukan peninjauan.'}
+                ? 'Myoton OCT workbook structure satisfies full 6-protocol bilateral and 9-point triplicate clinical specifications.'
+                : 'Format discrepancies detected that require review before downstream processing.'}
             </p>
           </div>
 
@@ -141,7 +141,7 @@ function ValidationDetailsModal({ validation, participantName, onClose }) {
             <div>
               <h4 className="font-bold text-slate-800 mb-2 flex items-center gap-1.5 text-xs">
                 <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-                <span>Masalah yang Terdeteksi ({validation.issues.length}):</span>
+                <span>Detected Issues ({validation.issues.length}):</span>
               </h4>
               <ul className="space-y-1.5 bg-slate-50 p-3 rounded-lg border border-slate-200 text-[11px] text-slate-700 font-mono">
                 {validation.issues.map((iss, idx) => (
@@ -158,7 +158,7 @@ function ValidationDetailsModal({ validation, participantName, onClose }) {
           <div className="bg-indigo-50/70 border border-indigo-100 rounded-xl p-3.5">
             <h4 className="font-bold text-indigo-900 mb-1 flex items-center gap-1.5 text-xs">
               <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-              <span>Rekomendasi Tindakan:</span>
+              <span>Actionable Recommendations:</span>
             </h4>
             <p className="text-[11px] text-indigo-800 leading-relaxed">
               {validation.recommendation}
@@ -173,13 +173,13 @@ function ValidationDetailsModal({ validation, participantName, onClose }) {
             className="flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
           >
             <Download className="w-3.5 h-3.5" />
-            <span>Unduh Template NewFormat.xlsx</span>
+            <span>Download NewFormat.xlsx Template</span>
           </button>
           <button
             onClick={onClose}
             className="px-4 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-semibold transition-colors cursor-pointer"
           >
-            Tutup
+            Close
           </button>
         </div>
       </div>
@@ -228,12 +228,12 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
           points: s.points || {},
           validation: s.validation || {
             status: s.protocols && s.protocols.length === 6 ? 'VALID' : 'WARNING',
-            badge: s.protocols && s.protocols.length === 6 ? 'Format Sesuai' : 'Peringatan Format',
+            badge: s.protocols && s.protocols.length === 6 ? 'Standard Format Verified' : 'Format Warning',
             color: s.protocols && s.protocols.length === 6 ? 'emerald' : 'amber',
             code: s.protocols && s.protocols.length === 6 ? 'PERFECT_MATCH' : 'INCOMPLETE_DATA',
-            title: s.protocols && s.protocols.length === 6 ? 'Format OCT Terverifikasi Sempurna' : 'Format Parsial',
-            issues: s.protocols && s.protocols.length === 6 ? [] : ['Protokol tidak lengkap (kurang dari 6 protokol).'],
-            recommendation: 'Gunakan template NewFormat.xlsx untuk protokol standar.',
+            title: s.protocols && s.protocols.length === 6 ? 'Standard OCT Format Fully Verified' : 'Partial / Incomplete Format',
+            issues: s.protocols && s.protocols.length === 6 ? [] : ['Incomplete protocol count (fewer than 6 protocols detected).'],
+            recommendation: 'Use the official NewFormat.xlsx template for standard clinical protocols.',
             protocolCount: s.protocols ? s.protocols.length : 0
           },
           date: s.protocols?.[0]?.date || 'Current Session'
@@ -288,7 +288,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
       setParticipants((prev) => [...prev, newSubj]);
       setExpandedId(newSubj.id);
     } catch (err) {
-      alert('Gagal membaca file: ' + err.message);
+      alert('Failed to read file: ' + err.message);
     }
     e.target.value = '';
   };
@@ -304,7 +304,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
         setExpandedId(newItems[0].id);
       }
     } catch (err) {
-      alert('Gagal membaca beberapa file: ' + err.message);
+      alert('Failed to read some files: ' + err.message);
     }
     e.target.value = '';
   };
@@ -327,7 +327,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
   // Export All Full ZIP Bundle (FormatOutput.xlsx + all 3D Surface PNGs)
   const handleExportAllBundle = async () => {
     if (participants.length === 0) {
-      alert('Belum ada data subjek untuk diekspor.');
+      alert('No subject data available to export.');
       return;
     }
     setIsExportingZip(true);
@@ -343,7 +343,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
             }
           });
           if (res && res.status === 'ok') {
-            alert(`Paket ekspor lengkap (Excel + 3D PNG) berhasil dibuat:\n${res.zip_path}`);
+            alert(`Complete export bundle (Excel + 3D PNGs) successfully created:\n${res.zip_path}`);
             setIsExportingZip(false);
             return;
           }
@@ -355,7 +355,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
       // 2. Client-side JSZip export
       await exportAllBundleZip(participants, `Myoton_Full_Export_${new Date().toISOString().split('T')[0]}.zip`);
     } catch (err) {
-      alert('Gagal mengekspor paket bundle: ' + err.message);
+      alert('Failed to export bundle package: ' + err.message);
     } finally {
       setIsExportingZip(false);
     }
@@ -364,7 +364,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
   // Export Excel Only
   const handleExportExcelOnly = () => {
     if (participants.length === 0) {
-      alert('Belum ada data subjek untuk diekspor.');
+      alert('No subject data available to export.');
       return;
     }
     exportFormatOutputWorkbook(participants, 'FormatOutput_All_Subjects.xlsx');
@@ -384,7 +384,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
         setExpandedId(newItems[0].id);
       }
     } catch (err) {
-      alert('Gagal memproses file yang di-drop: ' + err.message);
+      alert('Failed to process dropped files: ' + err.message);
     }
   };
 
@@ -518,7 +518,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                 </span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
-                Pemeriksaan komparatif kekakuan jaringan 9-titik, estimasi Mean & Median, serta proyeksi gradien 3D
+                Comparative 9-point tissue stiffness assessment, Mean & Median estimation, and 3D gradient vector projection
               </p>
             </div>
           </div>
@@ -546,7 +546,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
             <button
               onClick={() => singleInputRef.current?.click()}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-              title="Tambah satu subjek / file Excel baru ke sesi"
+              title="Add a new participant / Excel file to session"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>Add Participant</span>
@@ -556,7 +556,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
             <button
               onClick={() => bulkInputRef.current?.click()}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 hover:bg-slate-900 active:bg-black text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
-              title="Unggah banyak file Excel sekaligus (.xlsx)"
+              title="Upload multiple Excel files simultaneously (.xlsx)"
             >
               <FolderUp className="w-3.5 h-3.5" />
               <span>Bulk Upload</span>
@@ -571,7 +571,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                   ? 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white border-emerald-600 shadow-xs'
                   : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
               }`}
-              title="Ekspor paket lengkap: FormatOutput.xlsx dan seluruh gambar 3D Surface PNG (Before & After) ke dalam satu file .ZIP"
+              title="Export complete bundle: FormatOutput.xlsx and all 3D Surface PNG plots (Before & After) into a single .ZIP archive"
             >
               <FileArchive className="w-3.5 h-3.5" />
               <span>{isExportingZip ? 'Bundling ZIP...' : 'Export All (.ZIP: Excel + 3D PNGs)'}</span>
@@ -586,7 +586,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                   ? 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-300 shadow-2xs'
                   : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
               }`}
-              title="Ekspor tabel ringkasan ke format Excel (FormatOutput.xlsx)"
+              title="Export summary table to Excel format (FormatOutput.xlsx)"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
               <span>Excel Only</span>
@@ -596,7 +596,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
             <button
               onClick={downloadMyotonTemplate}
               className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-300 rounded-lg text-xs font-semibold transition-colors cursor-pointer"
-              title="Unduh template Excel resmi NewFormat.xlsx"
+              title="Download official blank NewFormat.xlsx template"
             >
               <Download className="w-3.5 h-3.5 text-slate-600" />
               <span>Template (NewFormat.xlsx)</span>
@@ -608,31 +608,31 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
         <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between text-xs text-slate-600">
           <div className="flex items-center gap-4">
             <span className="font-semibold text-slate-800">
-              Total Subjek:{' '}
+              Total Subjects:{' '}
               <span className="font-mono bg-slate-100 px-2 py-0.5 rounded text-slate-900 font-bold">
                 {statusCounts.total}
               </span>
             </span>
             <span className="flex items-center gap-1 text-emerald-700 font-medium">
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              {statusCounts.valid} Sesuai
+              {statusCounts.valid} Verified
             </span>
             {statusCounts.warning > 0 && (
               <span className="flex items-center gap-1 text-amber-700 font-medium">
                 <span className="w-2 h-2 rounded-full bg-amber-500" />
-                {statusCounts.warning} Peringatan
+                {statusCounts.warning} Warnings
               </span>
             )}
             {statusCounts.error > 0 && (
               <span className="flex items-center gap-1 text-rose-700 font-medium">
                 <span className="w-2 h-2 rounded-full bg-rose-500" />
-                {statusCounts.error} Format Rusak
+                {statusCounts.error} Invalid Format
               </span>
             )}
           </div>
 
           <span className="text-[11px] text-slate-400 italic hidden md:inline">
-            Tarik & lepas (drag and drop) file Excel (.xlsx) langsung ke area ini
+            Drag and drop Excel files (.xlsx) directly into this area
           </span>
         </div>
       </div>
@@ -646,9 +646,9 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
           <div className="w-12 h-12 rounded-full bg-indigo-50 group-hover:bg-indigo-100 text-indigo-600 mx-auto flex items-center justify-center transition-colors">
             <Upload className="w-6 h-6" />
           </div>
-          <h3 className="text-sm font-bold text-slate-800">Belum Ada Subjek Myoton yang Dimuat</h3>
+          <h3 className="text-sm font-bold text-slate-800">No Myoton Subjects Loaded</h3>
           <p className="text-xs text-slate-500 max-w-md mx-auto">
-            Klik di sini untuk mengunggah file <code>KYLE OCT.xlsx</code> / <code>NewFormat.xlsx</code>, atau gunakan tombol Bulk Upload di atas.
+            Click here to upload <code>KYLE OCT.xlsx</code> / <code>NewFormat.xlsx</code>, or use the Bulk Upload button above.
           </p>
         </div>
       ) : (
@@ -713,7 +713,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                               setEditNameText(p.name);
                             }}
                             className="opacity-0 group-hover/title:opacity-100 p-0.5 text-slate-400 hover:text-slate-700 rounded transition-opacity"
-                            title="Ubah nama subjek"
+                            title="Rename subject"
                           >
                             <Edit3 className="w-3 h-3" />
                           </button>
@@ -723,7 +723,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                       <div className="flex items-center gap-2 text-[11px] text-slate-400 mt-0.5 font-mono">
                         <span>{p.fileName}</span>
                         <span>•</span>
-                        <span>{p.protocols?.length || 0} Protokol</span>
+                        <span>{p.protocols?.length || 0} Protocols</span>
                         {p.date && (
                           <>
                             <span>•</span>
@@ -746,7 +746,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                     <button
                       onClick={(e) => handleExportSingle(p, e)}
                       className="hidden sm:flex items-center gap-1 px-2.5 py-1 bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200 rounded-lg text-xs font-medium transition-colors cursor-pointer"
-                      title="Ekspor FormatOutput untuk subjek ini"
+                      title="Export FormatOutput for this subject"
                     >
                       <FileDown className="w-3.5 h-3.5 text-slate-600" />
                       <span>Excel</span>
@@ -756,7 +756,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                     <button
                       onClick={(e) => handleDeleteParticipant(p.id, e)}
                       className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
-                      title="Hapus subjek dari sesi"
+                      title="Delete subject from session"
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -831,9 +831,9 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                                 ? 'bg-white text-indigo-700 shadow-2xs'
                                 : 'text-slate-600 hover:text-slate-900'
                             }`}
-                            title="Nilai tengah triplikat: n > min & n < max"
+                            title="Triplicate middle value: n > min & n < max"
                           >
-                            Median (Nilai Tengah)
+                            Median (Middle Value)
                           </button>
                         </div>
                       </div>
@@ -853,19 +853,19 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                           {analysis.proto.foot}
                         </span>
                         <span className="font-semibold text-slate-800">
-                          Frekuensi:{' '}
+                          Frequency:{' '}
                           <span className="font-mono text-indigo-700">
                             {analysis.proto.frequency}
                           </span>
                         </span>
                         <span className="font-semibold text-slate-800">
-                          Intensitas:{' '}
+                          Intensity:{' '}
                           <span className="font-mono text-amber-700">
                             {analysis.proto.intensity}
                           </span>
                         </span>
                         <span className="font-semibold text-slate-800">
-                          Metode:{' '}
+                          Method:{' '}
                           <span className="font-mono text-emerald-700 font-bold">
                             {currentMethod === 'median'
                               ? 'Median (n > min & n < max)'
@@ -878,7 +878,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                         onClick={() => setShowTriplicates(!showTriplicates)}
                         className="px-2.5 py-1 bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 rounded text-[11px] font-semibold cursor-pointer shadow-2xs"
                       >
-                        {showTriplicates ? 'Sembunyikan Triplikat (E1-E3)' : 'Tampilkan Triplikat (E1, E2, E3)'}
+                        {showTriplicates ? 'Hide Triplicates (E1-E3)' : 'Show Triplicates (E1, E2, E3)'}
                       </button>
                     </div>
 
@@ -924,7 +924,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                             : `${analysis.overallPct}%`}
                         </div>
                         <p className="text-[10px] text-slate-400 mt-0.5">
-                          {analysis.overallPct < 0 ? 'Pelemasan jaringan' : 'Pengerasan jaringan'}
+                          {analysis.overallPct < 0 ? 'Tissue softening' : 'Tissue stiffening'}
                         </p>
                       </div>
                     </div>
@@ -1003,10 +1003,10 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                       <div className="p-3.5 bg-slate-50 border-b border-slate-200 flex items-center justify-between">
                         <div>
                           <h4 className="font-bold text-slate-900 text-xs">
-                            Data Koordinat 9-Titik Kompas ({analysis.proto.name})
+                            9-Point Plantar Compass Coordinates ({analysis.proto.name})
                           </h4>
                           <p className="text-[11px] text-slate-500">
-                            Estimator aktif: {currentMethod === 'median' ? 'Median (Nilai Tengah: n > min & n < max)' : 'Mean (Average)'}
+                            Active estimator: {currentMethod === 'median' ? 'Median (Middle Value: n > min & n < max)' : 'Mean (Average)'}
                           </p>
                         </div>
                       </div>
@@ -1015,9 +1015,9 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                         <table className="w-full text-xs text-left">
                           <thead className="bg-slate-100 text-slate-700 font-semibold border-b border-slate-200 text-[11px]">
                             <tr>
-                              <th className="py-2.5 px-3">Titik (#)</th>
-                              <th className="py-2.5 px-3">Arah Kompas</th>
-                              <th className="py-2.5 px-3">Posisi Grid</th>
+                              <th className="py-2.5 px-3">Point (#)</th>
+                              <th className="py-2.5 px-3">Compass Direction</th>
+                              <th className="py-2.5 px-3">Grid Pos</th>
                               <th className="py-2.5 px-3 text-right">
                                 {currentMethod === 'median' ? 'Stiff Before [Median]' : 'Stiff Before'}
                               </th>
@@ -1027,11 +1027,11 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                               <th className="py-2.5 px-3 text-right font-bold">
                                 {currentMethod === 'median' ? 'Median Δ Stiff' : 'Mean Δ Stiff'}
                               </th>
-                              <th className="py-2.5 px-3 text-right font-bold">% Perubahan</th>
+                              <th className="py-2.5 px-3 text-right font-bold">% Change</th>
                               {showTriplicates && (
                                 <>
-                                  <th className="py-2.5 px-3 text-right">Triplikat Sebelum [E1, E2, E3]</th>
-                                  <th className="py-2.5 px-3 text-right">Triplikat Sesudah [E1, E2, E3]</th>
+                                  <th className="py-2.5 px-3 text-right">Triplicates Before [E1, E2, E3]</th>
+                                  <th className="py-2.5 px-3 text-right">Triplicates After [E1, E2, E3]</th>
                                 </>
                               )}
                             </tr>

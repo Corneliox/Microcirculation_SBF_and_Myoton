@@ -150,12 +150,12 @@ export function validateOctWorkbook(rawData) {
   if (!rawData || !Array.isArray(rawData) || rawData.length < 5) {
     return {
       status: 'ERROR',
-      badge: 'Format Rusak',
+      badge: 'Corrupted Format',
       color: 'rose',
       code: 'EMPTY_OR_UNREADABLE',
-      title: 'Berkas Kosong atau Tidak Terbaca',
-      issues: ['File Excel tidak memiliki baris data yang cukup untuk dianalisis.'],
-      recommendation: 'Pastikan file Excel berisi data hasil pengukuran Myoton OCT yang valid.',
+      title: 'Empty or Unreadable File',
+      issues: ['The Excel workbook does not contain sufficient rows for protocol analysis.'],
+      recommendation: 'Ensure the Excel workbook contains valid Myoton OCT measurement data.',
       protocolCount: 0
     };
   }
@@ -196,24 +196,24 @@ export function validateOctWorkbook(rawData) {
     if (hasSubject) {
       return {
         status: 'WARNING',
-        badge: 'Format Legacy',
+        badge: 'Legacy Subject Format',
         color: 'amber',
         code: 'LEGACY_FORMAT',
-        title: 'Format Tabel Subjek Lama (Legacy)',
-        issues: ['File menggunakan format Subject 9-point lama, bukan format OCT Protokol Standar.'],
-        recommendation: 'Gunakan template OCT Foot Measurement Record (NewFormat.xlsx) untuk fitur multi-protokol & triplikat lengkap.',
+        title: 'Legacy Subject Table Format',
+        issues: ['File uses legacy 9-point Subject format instead of Standard Multi-Protocol OCT Record.'],
+        recommendation: 'Use the official OCT Foot Measurement Record template (NewFormat.xlsx) for full multi-protocol and triplicate support.',
         protocolCount: 0
       };
     }
 
     return {
       status: 'UNKNOWN',
-      badge: 'Masalah Tidak Diketahui',
+      badge: 'Unknown Format Issue',
       color: 'slate',
       code: 'UNKNOWN_STRUCTURE',
-      title: 'Struktur Berkas Tidak Dikenali',
-      issues: ['File tidak memiliki header OCT, penanda Participant, maupun blok Protocol standar.'],
-      recommendation: 'Unduh template resmi NewFormat.xlsx melalui tombol di aplikasi, lalu salin data pengukuran ke dalamnya.',
+      title: 'Unrecognized File Structure',
+      issues: ['Workbook does not contain an OCT header, Participant marker, or standard Protocol blocks.'],
+      recommendation: 'Download the official NewFormat.xlsx template from the application toolbar and copy measurement data into it.',
       protocolCount: 0
     };
   }
@@ -221,12 +221,12 @@ export function validateOctWorkbook(rawData) {
   if (protoIndices.length === 0) {
     return {
       status: 'ERROR',
-      badge: 'Format Tidak Sesuai',
+      badge: 'Invalid Format',
       color: 'rose',
       code: 'MISSING_PROTOCOLS',
-      title: 'Tidak Ada Blok Protokol Terdeteksi',
-      issues: ['Header ditemukan tetapi tidak ada satupun baris Protocol 1, Protocol 2, dst.'],
-      recommendation: 'Pastikan baris judul protokol diawali kata "Protocol 1", "Protocol 2" hingga "Protocol 6".',
+      title: 'No Protocol Blocks Detected',
+      issues: ['Header identified but no lines beginning with "Protocol 1", "Protocol 2", etc. were found.'],
+      recommendation: 'Ensure each protocol header row begins with "Protocol 1", "Protocol 2", etc.',
       protocolCount: 0
     };
   }
@@ -252,7 +252,7 @@ export function validateOctWorkbook(rawData) {
           validPointsCount++;
           [e1Be, e2Be, e3Be, e1Af, e2Af, e3Af].forEach(v => {
             if (v < 30 || v > 3000) {
-              outOfRangeValues.push('Protokol ' + (idx + 1) + ' Titik ' + pIdx + ': Nilai ' + v + ' di luar rentang wajar (30 - 3000)');
+              outOfRangeValues.push('Protocol ' + (idx + 1) + ' Point ' + pIdx + ': Value ' + v + ' outside physiological range (30 - 3000)');
             }
           });
         }
@@ -261,25 +261,25 @@ export function validateOctWorkbook(rawData) {
     if (validPointsCount === 9) {
       completeProtocols++;
     } else {
-      issues.push('Protokol ' + (idx + 1) + ' hanya memiliki ' + validPointsCount + '/9 titik pengukuran terisi lengkap.');
+      issues.push('Protocol ' + (idx + 1) + ' only has ' + validPointsCount + '/9 points completely filled.');
     }
   });
 
   if (foundErrors.length > 0) {
     return {
       status: 'ERROR',
-      badge: 'Format Rusak',
+      badge: 'Corrupted Format',
       color: 'rose',
       code: 'FORMULA_ERRORS',
-      title: 'Terdapat Kesalahan Rumus Excel (#VALUE!, #REF!)',
+      title: 'Excel Formula Errors Detected (#VALUE!, #REF!)',
       issues: foundErrors.slice(0, 5),
-      recommendation: 'Periksa sel-sel Excel yang rusak di atas dan ganti dengan nilai numerik hasil pengukuran.',
+      recommendation: 'Check the corrupted Excel cells listed above and replace them with valid numeric measurement values.',
       protocolCount: protoIndices.length
     };
   }
 
   if (protoIndices.length < 6) {
-    issues.push('Hanya ditemukan ' + protoIndices.length + ' protokol (standar pengujian klinis adalah 6 protokol).');
+    issues.push('Only ' + protoIndices.length + ' protocols found (clinical standard requires 6 protocols).');
   }
 
   if (outOfRangeValues.length > 0) {
@@ -289,24 +289,24 @@ export function validateOctWorkbook(rawData) {
   if (issues.length > 0) {
     return {
       status: 'WARNING',
-      badge: 'Peringatan Format',
+      badge: 'Format Warning',
       color: 'amber',
       code: 'INCOMPLETE_DATA',
-      title: 'Format Sesuai Parsial',
+      title: 'Partial / Incomplete Format',
       issues: issues,
-      recommendation: 'Sebagian data titik atau protokol belum lengkap. Anda masih dapat menganalisis data yang tersedia.',
+      recommendation: 'Some measurement points or protocols are incomplete. You may still analyze the available data.',
       protocolCount: protoIndices.length
     };
   }
 
   return {
     status: 'VALID',
-    badge: 'Format Sesuai',
+    badge: 'Standard Format Verified',
     color: 'emerald',
     code: 'PERFECT_MATCH',
-    title: 'Format OCT Terverifikasi Sempurna',
+    title: 'Standard OCT Format Fully Verified',
     issues: [],
-    recommendation: 'Semua 6 protokol dan 9 titik pengukuran triplikat terverifikasi utuh.',
+    recommendation: 'All 6 clinical protocols and 9 triplicate measurement points are verified intact.',
     protocolCount: protoIndices.length
   };
 }

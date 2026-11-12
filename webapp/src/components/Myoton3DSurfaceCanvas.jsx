@@ -550,7 +550,7 @@ export default function Myoton3DSurfaceCanvas({
                     ? 'bg-white text-indigo-700 shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
-                title="Tampilkan grafik 3D Matplotlib kualitas publikasi ilmiah"
+                title="Display publication-grade Matplotlib 3D figure"
               >
                 HD Plot
               </button>
@@ -562,7 +562,7 @@ export default function Myoton3DSurfaceCanvas({
                     ? 'bg-white text-indigo-700 shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
                 }`}
-                title="Tampilkan kanvas grafis 3D interaktif"
+                title="Display interactive mathematical 3D canvas"
               >
                 Canvas 3D
               </button>
@@ -574,7 +574,7 @@ export default function Myoton3DSurfaceCanvas({
             onClick={handleDownload}
             disabled={downloading}
             className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-[11px] font-semibold transition-colors cursor-pointer shadow-2xs"
-            title="Download gambar 3D Surface beresolusi tinggi (PNG)"
+            title="Download high-resolution 3D surface plot (PNG)"
           >
             <Download className="w-3.5 h-3.5" />
             <span>{downloading ? 'Exporting...' : 'Save 3D PNG'}</span>
@@ -602,7 +602,7 @@ export default function Myoton3DSurfaceCanvas({
         {loadingPython && (
           <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-xs px-2.5 py-1 rounded-full border border-slate-200 text-[10px] text-slate-600 font-medium flex items-center gap-1.5 shadow-2xs">
             <RefreshCw className="w-3 h-3 animate-spin text-indigo-600" />
-            <span>Memperbarui HD Plot...</span>
+            <span>Updating HD Plot...</span>
           </div>
         )}
       </div>
@@ -611,14 +611,14 @@ export default function Myoton3DSurfaceCanvas({
       <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-500 pt-1">
         <span className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-blue-500" />
-          Vektor Quiver: Aliran Gradien Spasial
+          Quiver Vectors: Spatial Gradient Flow
         </span>
         <span className="flex items-center gap-1.5">
           <span className="w-2 h-2 rounded-full bg-red-500" />
-          Titik Kompas: 9 Lokasi Anatomis (P1 - P9)
+          Compass Nodes: 9 Anatomical Sites (P1 - P9)
         </span>
         <span className="font-mono text-[10px] text-slate-400">
-          Proyeksi 3D: elev=28°, azim=-55° • Viridis Colormap
+          3D Projection: elev=28°, azim=-55° • Viridis Colormap
         </span>
       </div>
     </div>
