@@ -28,7 +28,9 @@
       {
         "from": "../backend/dist/analyzer",
         "to": "backend/analyzer",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       },
       {
         "from": "../backend/analyzer_cli.py",
@@ -37,12 +39,19 @@
       {
         "from": "../core",
         "to": "core",
-        "filter": ["**/*"]
+        "filter": [
+          "**/*"
+        ]
       }
     ],
     "win": {
       "target": [
-        { "target": "nsis", "arch": ["x64"] }
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
       ]
     },
     "nsis": {
@@ -60,6 +69,7 @@
     }
   },
   "dependencies": {
+    "jszip": "^3.10.2",
     "lucide-react": "^1.45.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ChevronUp,
   FileSpreadsheet,
+  FileArchive,
   Sparkles,
   RefreshCw,
   Eye,
@@ -33,7 +34,7 @@ import CompassHeatmap from './CompassHeatmap';
 import Myoton3DSurfaceCanvas from './Myoton3DSurfaceCanvas';
 import { COMPASS_POINTS, validateOctWorkbook, parseKyleProtocolRecord, parseMyotonWorkbook } from '../utils/excelParser';
 import { mean, median, std } from '../utils/statistics';
-import { downloadMyotonTemplate, exportFormatOutputWorkbook, computeJsProtocolStats } from '../utils/templateGenerator';
+import { downloadMyotonTemplate, exportFormatOutputWorkbook, exportAllBundleZip, computeJsProtocolStats } from '../utils/templateGenerator';
 
 /**
  * Status Badge Component with Click-to-Inspect Validation Modal
@@ -191,6 +192,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
   const [participants, setParticipants] = useState([]);
   const [expandedId, setExpandedId] = useState(null);
   const [activeValidationModal, setActiveValidationModal] = useState(null);
+  const [isExportingZip, setIsExportingZip] = useState(false);
 
   // Per-participant interactive states
   const [selectedProtocols, setSelectedProtocols] = useState({}); // { [participantId]: protocolNum }
@@ -322,8 +324,45 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
     exportFormatOutputWorkbook([p], `FormatOutput_${p.name}.xlsx`);
   };
 
-  // Export All Participants FormatOutput
-  const handleExportAll = () => {
+  // Export All Full ZIP Bundle (FormatOutput.xlsx + all 3D Surface PNGs)
+  const handleExportAllBundle = async () => {
+    if (participants.length === 0) {
+      alert('Belum ada data subjek untuk diekspor.');
+      return;
+    }
+    setIsExportingZip(true);
+    try {
+      // 1. If in Electron Desktop mode, try Python engine first for Matplotlib 150-DPI publication plots
+      if (typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.runPythonAnalysis === 'function') {
+        try {
+          const res = await window.electronAPI.runPythonAnalysis({
+            task: 'export_all_bundle',
+            payload: {
+              participants: participants,
+              zip_path: 'Myoton_Biomechanics_v3_Full_Export.zip'
+            }
+          });
+          if (res && res.status === 'ok') {
+            alert(`Paket ekspor lengkap (Excel + 3D PNG) berhasil dibuat:\n${res.zip_path}`);
+            setIsExportingZip(false);
+            return;
+          }
+        } catch (pyErr) {
+          console.warn('Python ZIP export fallback to client-side JSZip:', pyErr);
+        }
+      }
+
+      // 2. Client-side JSZip export
+      await exportAllBundleZip(participants, `Myoton_Full_Export_${new Date().toISOString().split('T')[0]}.zip`);
+    } catch (err) {
+      alert('Gagal mengekspor paket bundle: ' + err.message);
+    } finally {
+      setIsExportingZip(false);
+    }
+  };
+
+  // Export Excel Only
+  const handleExportExcelOnly = () => {
     if (participants.length === 0) {
       alert('Belum ada data subjek untuk diekspor.');
       return;
@@ -523,19 +562,34 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
               <span>Bulk Upload</span>
             </button>
 
-            {/* [Export All FormatOutput.xlsx] */}
+            {/* [Export All (.ZIP: Excel + 3D PNGs)] */}
             <button
-              onClick={handleExportAll}
-              disabled={participants.length === 0}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
+              onClick={handleExportAllBundle}
+              disabled={participants.length === 0 || isExportingZip}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
                 participants.length > 0
-                  ? 'bg-emerald-50 text-emerald-700 border-emerald-300 hover:bg-emerald-100 shadow-2xs'
+                  ? 'bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white border-emerald-600 shadow-xs'
                   : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
               }`}
-              title="Ekspor seluruh subjek ke format standar FormatOutput.xlsx (Stiffness & Gradient Max, Min, Mean, Median & Direction)"
+              title="Ekspor paket lengkap: FormatOutput.xlsx dan seluruh gambar 3D Surface PNG (Before & After) ke dalam satu file .ZIP"
+            >
+              <FileArchive className="w-3.5 h-3.5" />
+              <span>{isExportingZip ? 'Bundling ZIP...' : 'Export All (.ZIP: Excel + 3D PNGs)'}</span>
+            </button>
+
+            {/* [Export Excel Only] */}
+            <button
+              onClick={handleExportExcelOnly}
+              disabled={participants.length === 0}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all cursor-pointer ${
+                participants.length > 0
+                  ? 'bg-slate-50 hover:bg-slate-100 text-slate-700 border-slate-300 shadow-2xs'
+                  : 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed'
+              }`}
+              title="Ekspor tabel ringkasan ke format Excel (FormatOutput.xlsx)"
             >
               <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Export All (FormatOutput.xlsx)</span>
+              <span>Excel Only</span>
             </button>
 
             {/* [Download Template] */}

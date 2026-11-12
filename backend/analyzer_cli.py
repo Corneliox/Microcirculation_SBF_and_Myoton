@@ -546,7 +546,7 @@ def run_fast_protocol_b(payload: dict):
 
 def main():
     parser = argparse.ArgumentParser(description="Microcirculation & Myoton Python CLI Analyzer")
-    parser.add_argument("--task", default="protocol_b_grid", choices=["health", "protocol_b_grid", "fast_grid", "parse_summary"])
+    parser.add_argument("--task", default="protocol_b_grid", choices=["health", "protocol_b_grid", "fast_grid", "parse_summary", "render_myoton_3d", "export_all_bundle"])
     parser.add_argument("--stdin", action="store_true", help="Read payload JSON from standard input")
     parser.add_argument("--payload-json", help="Direct JSON payload string or file")
     parser.add_argument("--micro-file", help="Path to microcirculation-data.xlsx")
@@ -566,7 +566,7 @@ def main():
         return
 
     # Fast Grid Execution via stdin or payload-json
-    if args.task == "fast_grid" or args.stdin or args.payload_json:
+    if args.task == "fast_grid":
         if args.stdin:
             input_data = sys.stdin.read()
             payload = json.loads(input_data)
@@ -584,6 +584,105 @@ def main():
             with open(args.output_json, "w", encoding="utf-8") as f:
                 json.dump(result, f, indent=2)
         print(json.dumps(result, indent=2))
+        return
+
+    # Task: Render 3D Surface Mesh (Matplotlib Publication-Grade)
+    if args.task == "render_myoton_3d":
+        if args.stdin:
+            input_data = sys.stdin.read()
+            payload = json.loads(input_data)
+        elif args.payload_json:
+            if os.path.exists(args.payload_json):
+                with open(args.payload_json, "r", encoding="utf-8") as pf:
+                    payload = json.load(pf)
+            else:
+                payload = json.loads(args.payload_json)
+        else:
+            payload = {}
+
+        from backend.myoton_v3_engine import render_myoton_3d_surface
+        grid = payload.get("grid_3x3", [[600]*3]*3)
+        title = payload.get("title", "Protocol")
+        stage = payload.get("stage_label", "After Therapy")
+        participant = payload.get("participant_name", "Subject")
+        out_path = payload.get("out_path", None)
+
+        res = render_myoton_3d_surface(grid, out_path=out_path, title=title, stage_label=stage, participant_name=participant, return_b64=True)
+        print(json.dumps(res))
+        return
+
+    # Task: Export All Bundle (Excel + 3D PNGs in ZIP)
+    if args.task == "export_all_bundle":
+        if args.stdin:
+            input_data = sys.stdin.read()
+            payload = json.loads(input_data)
+        elif args.payload_json:
+            if os.path.exists(args.payload_json):
+                with open(args.payload_json, "r", encoding="utf-8") as pf:
+                    payload = json.load(pf)
+            else:
+                payload = json.loads(args.payload_json)
+        else:
+            payload = {}
+
+        # Implementation for bundle export
+        from backend.myoton_v3_engine import generate_format_output_excel, render_myoton_3d_surface
+        import tempfile
+        from pathlib import Path
+        import zipfile
+        import shutil
+
+        participants = payload.get("participants", [])
+        zip_out = payload.get("zip_path", "Myoton_Biomechanics_v3_Full_Export.zip")
+        temp_dir = Path(tempfile.mkdtemp(prefix="myoton_export_"))
+
+        try:
+            # 1. Generate FormatOutput.xlsx
+            excel_path = temp_dir / "FormatOutput.xlsx"
+            generate_format_output_excel(participants, excel_path)
+
+            # 2. Render all 3D Surface PNGs
+            surfaces_dir = temp_dir / "3D_Surfaces"
+            surfaces_dir.mkdir(parents=True, exist_ok=True)
+
+            for p in participants:
+                p_name = p.get("name", "Subject")
+                p_dir = surfaces_dir / p_name
+                p_dir.mkdir(parents=True, exist_ok=True)
+
+                for proto in p.get("protocols", []):
+                    p_num = proto.get("protocolNum", 1)
+                    p_title = proto.get("name", f"Protocol {p_num}")
+                    pts = proto.get("points", {})
+
+                    # Extract 3x3 grids for Before and After
+                    from backend.myoton_v3_engine import COMPASS_POINTS
+                    grid_be = np.zeros((3, 3), dtype=float)
+                    grid_af = np.zeros((3, 3), dtype=float)
+                    for idx in range(1, 10):
+                        cp = COMPASS_POINTS[idx - 1]
+                        pt_data = pts.get(idx) or pts.get(str(idx)) or {}
+                        grid_be[cp["row"], cp["col"]] = float(pt_data.get("meanBefore", pt_data.get("before", 0.0)))
+                        grid_af[cp["row"], cp["col"]] = float(pt_data.get("meanAfter", pt_data.get("after", 0.0)))
+
+                    # Render Before & After
+                    p_before_file = p_dir / f"{p_name}_Protocol_{p_num}_Before_3d_surface.png"
+                    p_after_file = p_dir / f"{p_name}_Protocol_{p_num}_After_3d_surface.png"
+                    render_myoton_3d_surface(grid_be, p_before_file, p_title, "Before Therapy", p_name, return_b64=False)
+                    render_myoton_3d_surface(grid_af, p_after_file, p_title, "After Therapy", p_name, return_b64=False)
+
+            # 3. Create Zip file
+            zip_out_path = Path(zip_out).resolve()
+            with zipfile.ZipFile(zip_out_path, "w", zipfile.ZIP_DEFLATED) as zf:
+                for root, _, files in os.walk(temp_dir):
+                    for file in files:
+                        abs_f = Path(root) / file
+                        rel_f = abs_f.relative_to(temp_dir)
+                        zf.write(abs_f, arcname=str(rel_f))
+
+            print(json.dumps({"status": "ok", "zip_path": str(zip_out_path)}))
+        finally:
+            shutil.rmtree(temp_dir, ignore_errors=True)
         return
 
     if args.task == "protocol_b_grid":

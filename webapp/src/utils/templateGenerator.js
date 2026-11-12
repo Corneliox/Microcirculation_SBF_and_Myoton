@@ -1,3 +1,4 @@
+import JSZip from 'jszip';
 /**
  * Excel Template Generator for Microcirculation (SBF) and Myoton 9-Point Grid.
  * Enables one-click downloading of standardized, publication-grade Excel templates
@@ -450,7 +451,13 @@ export function computeJsProtocolStats(points, key = 'after') {
 /**
  * Exports multiple participants' data directly into the exact FormatOutput.xlsx specification.
  */
-export function exportFormatOutputWorkbook(participants, filename = 'FormatOutput.xlsx') {
+/**
+ * Creates the exact FormatOutput.xlsx workbook object with 3 multi-block sections:
+ * 1. Stiffness Max, Min, Mean, Median After Therapy
+ * 2. Stiffness Gradient Max, Min, Mean, Median After Therapy
+ * 3. Stiffness Direction Modus After Therapy
+ */
+export function createFormatOutputWorkbook(participants) {
   const wb = XLSX.utils.book_new();
 
   // Create 60 empty rows with 33 columns
@@ -536,5 +543,323 @@ export function exportFormatOutputWorkbook(participants, filename = 'FormatOutpu
 
   const ws = XLSX.utils.aoa_to_sheet(rows);
   XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+  return wb;
+}
+
+/**
+ * Downloads FormatOutput.xlsx directly
+ */
+export function exportFormatOutputWorkbook(participants, filename = 'FormatOutput.xlsx') {
+  const wb = createFormatOutputWorkbook(participants);
   downloadWorkbook(wb, filename);
+}
+
+/**
+ * Viridis colormap approximation for offscreen canvas
+ */
+function viridisCss(t) {
+  t = Math.max(0, Math.min(1, t));
+  const r = Math.round(255 * (0.267 + t * (0.005 + t * (2.78 - t * 2.05))));
+  const g = Math.round(255 * (0.004 + t * (1.42 + t * (-0.35 - t * 0.07))));
+  const b = Math.round(255 * (0.329 + t * (1.33 + t * (-2.68 + t * 1.34))));
+  return `rgb(${Math.max(0, Math.min(255, r))}, ${Math.max(0, Math.min(255, g))}, ${Math.max(0, Math.min(255, b))})`;
+}
+
+/**
+ * Renders an authentic Matplotlib-styled 3D surface plot on an offscreen canvas
+ * returning data URL (PNG)
+ */
+export function renderOffscreen3DSurface(grid3x3, participantName, title, stageLabel, width = 720, height = 560) {
+  if (typeof document === 'undefined') return '';
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  const ctx = canvas.getContext('2d');
+  const W = width;
+  const H = height;
+
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, W, H);
+
+  const N = 31;
+  const vals = grid3x3.flat();
+  const zMin = Math.min(...vals);
+  const zMax = Math.max(...vals);
+  const zSpan = Math.max(10, zMax - zMin);
+  const zBottom = zMin - zSpan * 0.40;
+  const zTop = zMax + zSpan * 0.15;
+
+  const Z = [];
+  const GX = [];
+  const GY = [];
+
+  for (let i = 0; i < N; i++) {
+    Z[i] = [];
+    GX[i] = [];
+    GY[i] = [];
+    const u = (i / (N - 1)) * 2.0;
+    const r0 = Math.floor(u);
+    const r1 = Math.min(2, r0 + 1);
+    const fr = u - r0;
+    const wr = 0.5 - 0.5 * Math.cos(fr * Math.PI);
+
+    for (let j = 0; j < N; j++) {
+      const v = (j / (N - 1)) * 2.0;
+      const c0 = Math.floor(v);
+      const c1 = Math.min(2, c0 + 1);
+      const fc = v - c0;
+      const wc = 0.5 - 0.5 * Math.cos(fc * Math.PI);
+
+      const v00 = grid3x3[r0][c0];
+      const v01 = grid3x3[r0][c1];
+      const v10 = grid3x3[r1][c0];
+      const v11 = grid3x3[r1][c1];
+
+      const top = v00 * (1 - wc) + v01 * wc;
+      const bot = v10 * (1 - wc) + v11 * wc;
+      Z[i][j] = top * (1 - wr) + bot * wr;
+    }
+  }
+
+  for (let i = 0; i < N; i++) {
+    for (let j = 0; j < N; j++) {
+      const gx = j === 0 ? (Z[i][1] - Z[i][0]) : j === N - 1 ? (Z[i][N - 1] - Z[i][N - 2]) : (Z[i][j + 1] - Z[i][j - 1]) * 0.5;
+      const gy = i === 0 ? (Z[1][j] - Z[0][j]) : i === N - 1 ? (Z[N - 1][j] - Z[N - 2][j]) : (Z[i + 1][j] - Z[i - 1][j]) * 0.5;
+      GX[i][j] = gx;
+      GY[i][j] = gy;
+    }
+  }
+
+  const elev = (28.0 * Math.PI) / 180.0;
+  const azim = (-55.0 * Math.PI) / 180.0;
+  const cosAzim = Math.cos(azim);
+  const sinAzim = Math.sin(azim);
+  const cosElev = Math.cos(elev);
+  const sinElev = Math.sin(elev);
+
+  const cx = W * 0.44;
+  const cy = H * 0.54;
+  const scaleBox = Math.min(W, H) * 0.40;
+
+  function project3D(x_cm, y_cm, z_val) {
+    const xc = (x_cm - 5.0) / 5.0;
+    const yc = (y_cm - 7.5) / 7.5;
+    const zc = (z_val - (zBottom + zTop) * 0.5) / ((zTop - zBottom) * 0.5 || 1);
+
+    const x1 = xc * cosAzim - yc * sinAzim;
+    const y1 = xc * sinAzim + yc * cosAzim;
+    const z1 = zc;
+
+    const x2 = x1;
+    const y2 = y1 * cosElev - z1 * sinElev;
+    const z2 = y1 * sinElev + z1 * cosElev;
+
+    const sx = cx + x2 * scaleBox * 1.35;
+    const sy = cy - z2 * scaleBox * 1.15;
+    return { sx, sy, depth: y2 };
+  }
+
+  // Draw Box
+  const f00 = project3D(0, 0, zBottom);
+  const f10 = project3D(10, 0, zBottom);
+  const f11 = project3D(10, 15, zBottom);
+  const f01 = project3D(0, 15, zBottom);
+  const c00 = project3D(0, 0, zTop);
+  const c10 = project3D(10, 0, zTop);
+  const c11 = project3D(10, 15, zTop);
+  const c01 = project3D(0, 15, zTop);
+
+  ctx.fillStyle = '#f8fafc';
+  ctx.beginPath();
+  ctx.moveTo(f00.sx, f00.sy);
+  ctx.lineTo(f10.sx, f10.sy);
+  ctx.lineTo(f11.sx, f11.sy);
+  ctx.lineTo(f01.sx, f01.sy);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = '#f1f5f9';
+  ctx.beginPath();
+  ctx.moveTo(f01.sx, f01.sy);
+  ctx.lineTo(f11.sx, f11.sy);
+  ctx.lineTo(c11.sx, c11.sy);
+  ctx.lineTo(c01.sx, c01.sy);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#cbd5e1';
+  ctx.lineWidth = 1;
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.moveTo(f00.sx, f00.sy);
+  ctx.lineTo(f01.sx, f01.sy);
+  ctx.lineTo(c01.sx, c01.sy);
+  ctx.lineTo(c00.sx, c00.sy);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+
+  // Bottom Quiver
+  const qStep = 4;
+  let maxMag = 0;
+  for (let i = 2; i < N - 2; i += qStep) {
+    for (let j = 2; j < N - 2; j += qStep) {
+      const m = Math.sqrt(GX[i][j] ** 2 + GY[i][j] ** 2);
+      if (m > maxMag) maxMag = m;
+    }
+  }
+  maxMag = maxMag || 1.0;
+
+  for (let i = 2; i < N - 2; i += qStep) {
+    for (let j = 2; j < N - 2; j += qStep) {
+      const x_cm = (j / (N - 1)) * 10.0;
+      const y_cm = (i / (N - 1)) * 15.0;
+      const gx = GX[i][j];
+      const gy = GY[i][j];
+      const mag = Math.sqrt(gx * gx + gy * gy);
+      if (mag > maxMag * 0.12) {
+        const normUx = (gx / maxMag) * 1.1;
+        const normUy = (gy / maxMag) * 1.5;
+        const p0 = project3D(x_cm, y_cm, zBottom);
+        const p1 = project3D(x_cm + normUx, y_cm + normUy, zBottom);
+        ctx.strokeStyle = '#0055ff';
+        ctx.fillStyle = '#0055ff';
+        ctx.lineWidth = 1.0;
+        ctx.beginPath();
+        ctx.moveTo(p0.sx, p0.sy);
+        ctx.lineTo(p1.sx, p1.sy);
+        ctx.stroke();
+      }
+    }
+  }
+
+  // 3D Surface Mesh
+  const quads = [];
+  for (let i = 0; i < N - 1; i++) {
+    for (let j = 0; j < N - 1; j++) {
+      const x0 = (j / (N - 1)) * 10.0;
+      const x1 = ((j + 1) / (N - 1)) * 10.0;
+      const y0 = (i / (N - 1)) * 15.0;
+      const y1 = ((i + 1) / (N - 1)) * 15.0;
+
+      const z00 = Z[i][j];
+      const z01 = Z[i][j + 1];
+      const z10 = Z[i + 1][j];
+      const z11 = Z[i + 1][j + 1];
+
+      const avgZ = (z00 + z01 + z10 + z11) * 0.25;
+      const p00 = project3D(x0, y0, z00);
+      const p01 = project3D(x1, y0, z01);
+      const p11 = project3D(x1, y1, z11);
+      const p10 = project3D(x0, y1, z10);
+      const avgDepth = (p00.depth + p01.depth + p11.depth + p10.depth) * 0.25;
+
+      quads.push({
+        p00, p01, p11, p10,
+        avgDepth,
+        tNorm: (avgZ - zMin) / (zSpan || 1)
+      });
+    }
+  }
+
+  quads.sort((a, b) => b.avgDepth - a.avgDepth);
+
+  quads.forEach((q) => {
+    ctx.fillStyle = viridisCss(q.tNorm);
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.20)';
+    ctx.lineWidth = 0.35;
+    ctx.beginPath();
+    ctx.moveTo(q.p00.sx, q.p00.sy);
+    ctx.lineTo(q.p01.sx, q.p01.sy);
+    ctx.lineTo(q.p11.sx, q.p11.sy);
+    ctx.lineTo(q.p10.sx, q.p10.sy);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  });
+
+  // Colorbar
+  const cbX = W - 55;
+  const cbY = 90;
+  const cbW = 14;
+  const cbH = H - 180;
+  for (let y = 0; y < cbH; y++) {
+    const tNorm = 1.0 - y / cbH;
+    ctx.fillStyle = viridisCss(tNorm);
+    ctx.fillRect(cbX, cbY + y, cbW, 1);
+  }
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(cbX, cbY, cbW, cbH);
+
+  // Title
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 13px sans-serif';
+  ctx.fillStyle = '#0f172a';
+  ctx.fillText(`${participantName} • ${title}`, W * 0.44, 28);
+  ctx.font = '11px sans-serif';
+  ctx.fillStyle = '#475569';
+  ctx.fillText(`3D Plantar Tissue Stiffness Surface (${stageLabel})`, W * 0.44, 46);
+
+  return canvas.toDataURL('image/png');
+}
+
+/**
+ * Exports Full ZIP bundle containing FormatOutput.xlsx and all 3D Surface PNG plots
+ */
+export async function exportAllBundleZip(participants, filename = 'Myoton_Biomechanics_v3_Full_Export.zip') {
+  const zip = new JSZip();
+
+  // 1. Generate FormatOutput.xlsx
+  const wb = createFormatOutputWorkbook(participants);
+  const wbArray = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+  zip.file('FormatOutput.xlsx', wbArray);
+
+  // 2. Generate 3D Surface PNGs for each participant and protocol
+  const surfacesFolder = zip.folder('3D_Surfaces');
+
+  for (const p of participants) {
+    const pName = p.name || 'Subject';
+    const pFolder = surfacesFolder.folder(pName);
+
+    const protocols = p.protocols || [];
+    for (const proto of protocols) {
+      const pNum = proto.protocolNum || 1;
+      const pTitle = proto.name || `Protocol ${pNum}`;
+      const pts = proto.points || {};
+
+      const gridBe = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+      const gridAf = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
+
+      for (let pIdx = 1; pIdx <= 9; pIdx++) {
+        const cp = COMPASS_POINTS.find(c => c.id === pIdx);
+        const pt = pts[pIdx] || {};
+        const vBe = pt.meanBefore ?? pt.before ?? 0;
+        const vAf = pt.meanAfter ?? pt.after ?? 0;
+        if (cp) {
+          gridBe[cp.row][cp.col] = vBe;
+          gridAf[cp.row][cp.col] = vAf;
+        }
+      }
+
+      const pngBe = renderOffscreen3DSurface(gridBe, pName, pTitle, 'Before Therapy');
+      const pngAf = renderOffscreen3DSurface(gridAf, pName, pTitle, 'After Therapy');
+
+      const b64Be = pngBe.replace(/^data:image\/png;base64,/, '');
+      const b64Af = pngAf.replace(/^data:image\/png;base64,/, '');
+
+      pFolder.file(`${pName}_Protocol_${pNum}_Before_3d_surface.png`, b64Be, { base64: true });
+      pFolder.file(`${pName}_Protocol_${pNum}_After_3d_surface.png`, b64Af, { base64: true });
+    }
+  }
+
+  const content = await zip.generateAsync({ type: 'blob' });
+  const url = URL.createObjectURL(content);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }

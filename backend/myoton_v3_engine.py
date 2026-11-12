@@ -12,13 +12,16 @@ Capabilities:
 import os
 import re
 from pathlib import Path
-from typing import Dict, List, Any, Tuple, Optional
+from typing import Dict, List, Any, Tuple, Optional, Union
 from collections import Counter
 
 import numpy as np
 import scipy.interpolate as interp
 import pandas as pd
 import openpyxl
+import io
+import base64
+import zipfile
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -310,15 +313,18 @@ def compute_stiffness_and_gradient_stats(grid_3x3: np.ndarray, dense_res: int = 
 
 def render_myoton_3d_surface(
     grid_3x3: np.ndarray,
-    out_path: Path,
-    title: str,
+    out_path: Optional[Union[str, Path]] = None,
+    title: str = "Protocol 1",
     stage_label: str = "After Therapy",
-    participant_name: str = "Subject"
-) -> str:
+    participant_name: str = "Subject",
+    return_b64: bool = True
+) -> Dict[str, Any]:
     """
     Renders publication-grade 3D surface mesh with bottom plane contour lines
     and quiver arrows showing gradient vector flow (identical to ThermalSight style).
+    Returns dict with file path and base64 encoded data URI.
     """
+    grid_3x3 = np.asarray(grid_3x3, dtype=float)
     stats = compute_stiffness_and_gradient_stats(grid_3x3, dense_res=50)
     X = stats["dense_X"]
     Y = stats["dense_Y"]
@@ -405,19 +411,36 @@ def render_myoton_3d_surface(
     cbar = fig.colorbar(surf, ax=ax, shrink=0.55, aspect=14, pad=0.08)
     cbar.set_label("Dynamic Stiffness", fontsize=9)
 
-    out_path = Path(out_path)
-    out_path.parent.mkdir(parents=True, exist_ok=True)
     plt.tight_layout()
-    fig.savefig(str(out_path), bbox_inches="tight")
+
+    saved_path = None
+    if out_path:
+        out_path = Path(out_path)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        fig.savefig(str(out_path), bbox_inches="tight")
+        saved_path = str(out_path)
+
+    b64_str = ""
+    if return_b64:
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", bbox_inches="tight")
+        b64_raw = base64.b64encode(buf.getvalue()).decode("utf-8")
+        b64_str = f"data:image/png;base64,{b64_raw}"
+        buf.close()
+
     plt.close(fig)
 
-    return str(out_path)
+    return {
+        "status": "ok",
+        "filepath": saved_path,
+        "image_base64": b64_str
+    }
 
 
 def generate_format_output_excel(
     participants_data: List[Dict[str, Any]],
-    template_path: str,
     output_excel_path: str,
+    template_path: Optional[str] = None,
     output_csv_path: Optional[str] = None
 ) -> str:
     """
@@ -428,6 +451,49 @@ def generate_format_output_excel(
     - Block 3 (Rows 42-58): Stiffness Direction Modus After Therapy
     Also writes tidy CSV for downstream analytics.
     """
+    # Resolve template path
+    if not template_path or not os.path.exists(template_path):
+        candidates = [
+            r"D:\Download Move1\FormatOutput.xlsx",
+            os.path.join(os.path.dirname(__file__), "..", "output_v3_demo", "FormatOutput_KYLE.xlsx"),
+            os.path.join(os.path.dirname(__file__), "FormatOutput.xlsx")
+        ]
+        found = False
+        for c in candidates:
+            if os.path.exists(c):
+                template_path = c
+                found = True
+                break
+        if not found:
+            # Create a blank workbook with headers if template is missing
+            wb_new = openpyxl.Workbook()
+            ws_new = wb_new.active
+            ws_new.title = "Sheet1"
+            # Block 1 headers
+            ws_new.cell(2, 3).value = "Stiffness Max After Therapy"
+            ws_new.cell(2, 11).value = "Stiffness Min After Therapy"
+            ws_new.cell(2, 19).value = "Stiffness Mean After Therapy"
+            ws_new.cell(2, 27).value = "Stiffness Median After Therapy"
+            proto_hdrs = ["Subject", "Protocol 1", "Protocol 2", "Protocol 3", "Protocol 4", "Protocol 5", "Protocol 6"]
+            for b in range(4):
+                col_start = 2 + b * 8
+                for h_idx, h in enumerate(proto_hdrs):
+                    ws_new.cell(3, col_start + h_idx).value = h
+            # Block 2 headers
+            ws_new.cell(22, 3).value = "Stiffness Gradient Max After Therapy"
+            ws_new.cell(22, 11).value = "Stiffness Gradient Min After Therapy"
+            ws_new.cell(22, 19).value = "Stiffness Gradient Mean After Therapy"
+            ws_new.cell(22, 27).value = "Stiffness Gradient Median After Therapy"
+            for b in range(4):
+                col_start = 2 + b * 8
+                for h_idx, h in enumerate(proto_hdrs):
+                    ws_new.cell(23, col_start + h_idx).value = h
+            # Block 3 header
+            ws_new.cell(42, 3).value = "Stiffness Direction mmodus After Therapy"
+            for h_idx, h in enumerate(proto_hdrs):
+                ws_new.cell(43, 2 + h_idx).value = h
+            wb_new.save(output_excel_path)
+            template_path = output_excel_path
     wb = openpyxl.load_workbook(template_path)
     sheet = wb["Sheet1"]
 
@@ -438,7 +504,7 @@ def generate_format_output_excel(
         if subj_row > 18:
             break
 
-        p_name = p_data.get("participant", f"Subject_{s_idx}")
+        p_name = p_data.get("name") or p_data.get("participant", f"Subject_{s_idx}")
         protocols = p_data.get("protocols", [])
 
         # Set subject label
@@ -480,10 +546,10 @@ def generate_format_output_excel(
                 tidy_rows.append({
                     "Subject": p_name,
                     "ProtocolNum": p_idx,
-                    "ProtocolName": proto["name"],
-                    "Frequency": proto["frequency"],
-                    "Intensity": proto["intensity"],
-                    "Foot": proto["foot"],
+                    "ProtocolName": proto.get("name", f"Protocol {p_idx}"),
+                    "Frequency": proto.get("frequency", "Unknown"),
+                    "Intensity": proto.get("intensity", "Unknown"),
+                    "Foot": proto.get("foot", "Unknown"),
                     "Stiff_Max_After": stats["stiffness_max"],
                     "Stiff_Min_After": stats["stiffness_min"],
                     "Stiff_Mean_After": stats["stiffness_mean"],

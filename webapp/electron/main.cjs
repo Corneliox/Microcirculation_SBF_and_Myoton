@@ -102,7 +102,7 @@ ipcMain.handle('run-python-analysis', async (event, params) => {
     }
 
     if (params.payload) {
-      args.push('--task', 'fast_grid', '--stdin');
+      args.push('--task', params.task || 'fast_grid', '--stdin');
     } else {
       args.push('--task', params.task || 'protocol_b_grid');
       if (params.microFile) args.push('--micro-file', params.microFile);

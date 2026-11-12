@@ -1,39 +1,82 @@
-import React, { useRef, useEffect, useState } from 'react';
-import { Download, RefreshCw, Eye, Maximize2 } from 'lucide-react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
+import { Download, RefreshCw, Eye, Sparkles, Image, Maximize2 } from 'lucide-react';
 
 /**
- * Viridis colormap approximation for scientific visualization
+ * High-precision Viridis colormap mapping [0, 1] -> [r, g, b]
  */
-function viridisColor(t) {
-  // Clamp t to [0, 1]
+function viridisRgb(t) {
   t = Math.max(0, Math.min(1, t));
-  // High quality 5-point Viridis polynomial approximation
+  // 5-node polynomial approximation for matplotlib viridis
   const r = Math.round(255 * (0.267 + t * (0.005 + t * (2.78 - t * 2.05))));
   const g = Math.round(255 * (0.004 + t * (1.42 + t * (-0.35 - t * 0.07))));
   const b = Math.round(255 * (0.329 + t * (1.33 + t * (-2.68 + t * 1.34))));
-  return `rgb(${Math.max(0, Math.min(255, r))}, ${Math.max(0, Math.min(255, g))}, ${Math.max(0, Math.min(255, b))})`;
+  return [Math.max(0, Math.min(255, r)), Math.max(0, Math.min(255, g)), Math.max(0, Math.min(255, b))];
+}
+
+function viridisCss(t) {
+  const [r, g, b] = viridisRgb(t);
+  return `rgb(${r}, ${g}, ${b})`;
 }
 
 /**
- * Myoton 3D Plantar Tissue Stiffness Surface Mesh Canvas
- * Features:
- * - 3D Surface mesh with Viridis colormap and wireframe edges
- * - Bottom plane contour projections
- * - Gradient vector quiver field (blue arrows indicating gradient direction)
- * - 9 Anatomical compass markers (NW, N, NE, W, C, E, SW, S, SE)
- * - 1-Click PNG Download
+ * 3D Plantar Tissue Stiffness Surface Visualizer
+ * Replicates the authentic publication standard of ThermalSight
+ * (isolated_FLIR0207_m2_3_3d_surface.png) with:
+ * - Elevation 28 deg, Azimuth -55 deg
+ * - 3D Box with projection planes & axes ticks
+ * - Continuous Viridis colormap & 3D diffuse shading
+ * - 10-level bottom plane contours & blue quiver arrows
+ * - 9 Red compass nodes (P1-P9) with anatomical labels
+ * - High-DPI Matplotlib IPC integration for Electron desktop mode
  */
 export default function Myoton3DSurfaceCanvas({
   grid3x3,
   title = "Protocol 1",
   stageLabel = "After Therapy",
   participantName = "Subject",
-  width = 680,
-  height = 520
+  width = 720,
+  height = 560
 }) {
   const canvasRef = useRef(null);
+  const [matplotlibImg, setMatplotlibImg] = useState(null);
+  const [viewMode, setViewMode] = useState('auto'); // 'hd' | 'canvas' | 'auto'
+  const [loadingPython, setLoadingPython] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
+  // Request high-resolution Matplotlib 3D render from Python backend in Electron mode
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchPythonRender() {
+      if (typeof window !== 'undefined' && window.electronAPI && typeof window.electronAPI.runPythonAnalysis === 'function') {
+        try {
+          setLoadingPython(true);
+          const res = await window.electronAPI.runPythonAnalysis({
+            task: 'render_myoton_3d',
+            payload: {
+              grid_3x3: grid3x3,
+              title: title,
+              stage_label: stageLabel,
+              participant_name: participantName
+            }
+          });
+          if (isMounted && res && res.image_base64) {
+            setMatplotlibImg(res.image_base64);
+          }
+        } catch (err) {
+          console.warn('Python 3D render fallback to mathematical canvas:', err);
+        } finally {
+          if (isMounted) setLoadingPython(false);
+        }
+      }
+    }
+
+    if (grid3x3 && grid3x3.length === 3) {
+      fetchPythonRender();
+    }
+    return () => { isMounted = false; };
+  }, [grid3x3, title, stageLabel, participantName]);
+
+  // Client-side high-precision 3D Canvas rendering (matching Matplotlib 3D box, elev=28, azim=-55)
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !grid3x3 || grid3x3.length !== 3) return;
@@ -42,325 +85,541 @@ export default function Myoton3DSurfaceCanvas({
     const W = canvas.width;
     const H = canvas.height;
 
-    // Clear background
+    ctx.clearRect(0, 0, W, H);
     ctx.fillStyle = '#ffffff';
     ctx.fillRect(0, 0, W, H);
 
-    // 1. Bilinear / Bicubic interpolation of 3x3 to 31x31 dense grid
+    // 1. Data boundaries & 3D coordinate system
     const N = 31;
+    const vals = grid3x3.flat();
+    const zMin = Math.min(...vals);
+    const zMax = Math.max(...vals);
+    const zSpan = Math.max(10, zMax - zMin);
+    const zBottom = zMin - zSpan * 0.40;
+    const zTop = zMax + zSpan * 0.15;
+
+    // Interpolate 3x3 grid to NxN mesh (bicubic/bilinear)
     const Z = [];
-    let zMin = Infinity;
-    let zMax = -Infinity;
+    const GX = [];
+    const GY = [];
 
     for (let i = 0; i < N; i++) {
       Z[i] = [];
-      const u = (i / (N - 1)) * 2.0; // 0.0 to 2.0 (row in 3x3)
+      GX[i] = [];
+      GY[i] = [];
+      const u = (i / (N - 1)) * 2.0; // row in [0, 2]
       const r0 = Math.floor(u);
       const r1 = Math.min(2, r0 + 1);
       const fr = u - r0;
-      // Smooth Hermite blend
-      const hr = fr * fr * (3 - 2 * fr);
+      const wr = 0.5 - 0.5 * Math.cos(fr * Math.PI); // smooth cosine
 
       for (let j = 0; j < N; j++) {
-        const v = (j / (N - 1)) * 2.0; // 0.0 to 2.0 (col in 3x3)
+        const v = (j / (N - 1)) * 2.0; // col in [0, 2]
         const c0 = Math.floor(v);
         const c1 = Math.min(2, c0 + 1);
         const fc = v - c0;
-        const hc = fc * fc * (3 - 2 * fc);
+        const wc = 0.5 - 0.5 * Math.cos(fc * Math.PI);
 
-        // Bilinear blend of 4 nearest 3x3 nodes
-        const v00 = grid3x3[r0][c0] || 0;
-        const v01 = grid3x3[r0][c1] || 0;
-        const v10 = grid3x3[r1][c0] || 0;
-        const v11 = grid3x3[r1][c1] || 0;
+        const v00 = grid3x3[r0][c0];
+        const v01 = grid3x3[r0][c1];
+        const v10 = grid3x3[r1][c0];
+        const v11 = grid3x3[r1][c1];
 
-        const val = (v00 * (1 - hc) + v01 * hc) * (1 - hr) + (v10 * (1 - hc) + v11 * hc) * hr;
-        Z[i][j] = val;
-        if (val < zMin) zMin = val;
-        if (val > zMax) zMax = val;
+        const top = v00 * (1 - wc) + v01 * wc;
+        const bot = v10 * (1 - wc) + v11 * wc;
+        const z = top * (1 - wr) + bot * wr;
+        Z[i][j] = z;
       }
     }
 
-    const zSpan = Math.max(1.0, zMax - zMin);
-    const zBottom = zMin - zSpan * 0.45;
-
-    // 2. 3D Isometric Projection setup
-    // Center of projection
-    const cx = W * 0.50;
-    const cy = H * 0.54;
-    const scaleX = W * 0.013;
-    const scaleY = H * 0.0075;
-    const scaleZ = (H * 0.38) / zSpan;
-
-    // Rotation angle (~ -55 deg azim, 28 deg elev)
-    const cosA = Math.cos(Math.PI / 6.0); // 30 deg
-    const sinA = Math.sin(Math.PI / 6.0);
-
-    function project3D(x, y, z) {
-      // Map x, y from [0, N-1] centered to [-15, +15]
-      const nx = (x - (N - 1) / 2.0) * 1.0;
-      const ny = (y - (N - 1) / 2.0) * 1.3;
-      const nz = z - zMin;
-
-      // Isometric transformation
-      const px = cx + (nx - ny) * cosA * scaleX * 1.7;
-      const py = cy + (nx + ny) * sinA * scaleY * 2.1 - nz * scaleZ;
-      return [px, py];
+    // Gradients for quiver arrows
+    for (let i = 0; i < N; i++) {
+      for (let j = 0; j < N; j++) {
+        const gx = j === 0 ? (Z[i][1] - Z[i][0]) : j === N - 1 ? (Z[i][N - 1] - Z[i][N - 2]) : (Z[i][j + 1] - Z[i][j - 1]) * 0.5;
+        const gy = i === 0 ? (Z[1][j] - Z[0][j]) : i === N - 1 ? (Z[N - 1][j] - Z[N - 2][j]) : (Z[i + 1][j] - Z[i - 1][j]) * 0.5;
+        GX[i][j] = gx;
+        GY[i][j] = gy;
+      }
     }
 
-    // 3. Render Bottom Plane (Bounding box & Contours)
-    const pB00 = project3D(0, 0, zBottom);
-    const pB01 = project3D(N - 1, 0, zBottom);
-    const pB11 = project3D(N - 1, N - 1, zBottom);
-    const pB10 = project3D(0, N - 1, zBottom);
+    // 2. 3D Camera Projection (elev=28 deg, azim=-55 deg matching Matplotlib)
+    const elev = (28.0 * Math.PI) / 180.0;
+    const azim = (-55.0 * Math.PI) / 180.0;
+    const cosAzim = Math.cos(azim);
+    const sinAzim = Math.sin(azim);
+    const cosElev = Math.cos(elev);
+    const sinElev = Math.sin(elev);
 
-    // Bottom plane base fill
+    // Viewport scale & origin
+    const cx = W * 0.44;
+    const cy = H * 0.54;
+    const scaleBox = Math.min(W, H) * 0.40;
+
+    function project3D(x_cm, y_cm, z_val) {
+      // Normalize to [-1, 1]
+      const xc = (x_cm - 5.0) / 5.0;      // Plantar Width (0 to 10 cm)
+      const yc = (y_cm - 7.5) / 7.5;      // Plantar Length (0 to 15 cm)
+      const zc = (z_val - (zBottom + zTop) * 0.5) / ((zTop - zBottom) * 0.5 || 1);
+
+      // Rotate azimuth (around Z)
+      const x1 = xc * cosAzim - yc * sinAzim;
+      const y1 = xc * sinAzim + yc * cosAzim;
+      const z1 = zc;
+
+      // Rotate elevation (tilt around X)
+      const x2 = x1;
+      const y2 = y1 * cosElev - z1 * sinElev;
+      const z2 = y1 * sinElev + z1 * cosElev;
+
+      const sx = cx + x2 * scaleBox * 1.35;
+      const sy = cy - z2 * scaleBox * 1.15;
+      return { sx, sy, depth: y2 };
+    }
+
+    // 3. Draw 3D Box Walls & Background Grid
+    // Floor vertices (z = zBottom)
+    const f00 = project3D(0, 0, zBottom);
+    const f10 = project3D(10, 0, zBottom);
+    const f11 = project3D(10, 15, zBottom);
+    const f01 = project3D(0, 15, zBottom);
+
+    // Ceiling vertices (z = zTop)
+    const c00 = project3D(0, 0, zTop);
+    const c10 = project3D(10, 0, zTop);
+    const c11 = project3D(10, 15, zTop);
+    const c01 = project3D(0, 15, zTop);
+
+    // Draw Floor plane
     ctx.fillStyle = '#f8fafc';
     ctx.beginPath();
-    ctx.moveTo(pB00[0], pB00[1]);
-    ctx.lineTo(pB01[0], pB01[1]);
-    ctx.lineTo(pB11[0], pB11[1]);
-    ctx.lineTo(pB10[0], pB10[1]);
+    ctx.moveTo(f00.sx, f00.sy);
+    ctx.lineTo(f10.sx, f10.sy);
+    ctx.lineTo(f11.sx, f11.sy);
+    ctx.lineTo(f01.sx, f01.sy);
     ctx.closePath();
     ctx.fill();
 
+    // Draw Back walls (XZ and YZ)
+    ctx.fillStyle = '#f1f5f9';
+    // Back wall 1 (x=0 to 10, y=15)
+    ctx.beginPath();
+    ctx.moveTo(f01.sx, f01.sy);
+    ctx.lineTo(f11.sx, f11.sy);
+    ctx.lineTo(c11.sx, c11.sy);
+    ctx.lineTo(c01.sx, c01.sy);
+    ctx.closePath();
+    ctx.fill();
     ctx.strokeStyle = '#cbd5e1';
-    ctx.lineWidth = 1.0;
+    ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Bottom contour rings
-    const numLevels = 8;
-    for (let lev = 1; lev <= numLevels; lev++) {
-      const cZ = zMin + (lev / (numLevels + 1)) * zSpan;
-      const color = viridisColor(lev / numLevels);
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 0.85;
+    // Back wall 2 (x=0, y=0 to 15)
+    ctx.beginPath();
+    ctx.moveTo(f00.sx, f00.sy);
+    ctx.lineTo(f01.sx, f01.sy);
+    ctx.lineTo(c01.sx, c01.sy);
+    ctx.lineTo(c00.sx, c00.sy);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
 
-      // Simple marching squares line segments approximation on bottom plane
-      for (let i = 0; i < N - 1; i += 2) {
-        for (let j = 0; j < N - 1; j += 2) {
-          const v0 = Z[i][j];
-          const v1 = Z[i + 1][j + 1];
-          if ((v0 <= cZ && v1 >= cZ) || (v0 >= cZ && v1 <= cZ)) {
-            const p1 = project3D(j, i, zBottom);
-            const p2 = project3D(j + 1, i + 1, zBottom);
+    // Grid lines on walls
+    ctx.strokeStyle = '#e2e8f0';
+    ctx.lineWidth = 0.75;
+    for (let k = 0; k <= 4; k++) {
+      const zTick = zBottom + (zTop - zBottom) * (k / 4);
+      const p1 = project3D(0, 0, zTick);
+      const p2 = project3D(0, 15, zTick);
+      const p3 = project3D(10, 15, zTick);
+      ctx.beginPath();
+      ctx.moveTo(p1.sx, p1.sy);
+      ctx.lineTo(p2.sx, p2.sy);
+      ctx.lineTo(p3.sx, p3.sy);
+      ctx.stroke();
+    }
+
+    // 4. Bottom Plane Contours (10 levels in Viridis)
+    const numLevels = 10;
+    for (let lvl = 0; lvl < numLevels; lvl++) {
+      const targetZ = zMin + zSpan * (lvl / (numLevels - 1));
+      const tNorm = lvl / (numLevels - 1);
+      ctx.strokeStyle = viridisCss(tNorm);
+      ctx.lineWidth = 1.1;
+
+      for (let i = 0; i < N - 1; i++) {
+        for (let j = 0; j < N - 1; j++) {
+          const z00 = Z[i][j];
+          const z01 = Z[i][j + 1];
+          const z10 = Z[i + 1][j];
+          if ((z00 <= targetZ && z01 >= targetZ) || (z00 >= targetZ && z01 <= targetZ)) {
+            const frac = (targetZ - z00) / ((z01 - z00) || 1e-4);
+            const xA = (j + frac) * (10 / (N - 1));
+            const yA = i * (15 / (N - 1));
+            const pA = project3D(xA, yA, zBottom);
             ctx.beginPath();
-            ctx.moveTo(p1[0], p1[1]);
-            ctx.lineTo(p2[0], p2[1]);
+            ctx.arc(pA.sx, pA.sy, 0.8, 0, Math.PI * 2);
             ctx.stroke();
           }
         }
       }
     }
 
-    // 4. Render Bottom Plane Quiver Vectors (Blue Gradient Arrows)
-    ctx.strokeStyle = '#0284c7';
-    ctx.fillStyle = '#0284c7';
-    ctx.lineWidth = 1.0;
-
+    // 5. Bottom Plane Quiver Vectors (Blue Gradient Arrows)
     const qStep = 4;
-    for (let i = qStep; i < N - qStep; i += qStep) {
-      for (let j = qStep; j < N - qStep; j += qStep) {
-        // Gradient calculation: central difference
-        const gx = (Z[i][j + 1] - Z[i][j - 1]) * 0.5;
-        const gy = (Z[i + 1][j] - Z[i - 1][j]) * 0.5;
+    let maxMag = 0;
+    for (let i = 2; i < N - 2; i += qStep) {
+      for (let j = 2; j < N - 2; j += qStep) {
+        const m = Math.sqrt(GX[i][j] ** 2 + GY[i][j] ** 2);
+        if (m > maxMag) maxMag = m;
+      }
+    }
+    maxMag = maxMag || 1.0;
+
+    for (let i = 2; i < N - 2; i += qStep) {
+      for (let j = 2; j < N - 2; j += qStep) {
+        const x_cm = (j / (N - 1)) * 10.0;
+        const y_cm = (i / (N - 1)) * 15.0;
+        const gx = GX[i][j];
+        const gy = GY[i][j];
         const mag = Math.sqrt(gx * gx + gy * gy);
 
-        if (mag > 0.05) {
-          const normGx = (gx / mag) * 1.5;
-          const normGy = (gy / mag) * 1.5;
+        if (mag > maxMag * 0.12) {
+          const normUx = (gx / maxMag) * 1.1;
+          const normUy = (gy / maxMag) * 1.5;
 
-          const [x0, y0] = project3D(j, i, zBottom);
-          const [x1, y1] = project3D(j + normGx, i + normGy, zBottom);
+          const p0 = project3D(x_cm, y_cm, zBottom);
+          const p1 = project3D(x_cm + normUx, y_cm + normUy, zBottom);
+
+          ctx.strokeStyle = '#0055ff';
+          ctx.fillStyle = '#0055ff';
+          ctx.lineWidth = 1.0;
 
           ctx.beginPath();
-          ctx.moveTo(x0, y0);
-          ctx.lineTo(x1, y1);
+          ctx.moveTo(p0.sx, p0.sy);
+          ctx.lineTo(p1.sx, p1.sy);
           ctx.stroke();
 
-          // Arrow head
-          const angle = Math.atan2(y1 - y0, x1 - x0);
-          const arrowLen = 3.5;
-          ctx.beginPath();
-          ctx.moveTo(x1, y1);
-          ctx.lineTo(x1 - arrowLen * Math.cos(angle - Math.PI / 6), y1 - arrowLen * Math.sin(angle - Math.PI / 6));
-          ctx.lineTo(x1 - arrowLen * Math.cos(angle + Math.PI / 6), y1 - arrowLen * Math.sin(angle + Math.PI / 6));
-          ctx.closePath();
-          ctx.fill();
+          // Arrowhead
+          const dx = p1.sx - p0.sx;
+          const dy = p1.sy - p0.sy;
+          const len = Math.sqrt(dx * dx + dy * dy);
+          if (len > 3) {
+            const angle = Math.atan2(dy, dx);
+            const aLen = 4;
+            ctx.beginPath();
+            ctx.moveTo(p1.sx, p1.sy);
+            ctx.lineTo(p1.sx - aLen * Math.cos(angle - Math.PI / 6), p1.sy - aLen * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(p1.sx - aLen * Math.cos(angle + Math.PI / 6), p1.sy - aLen * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fill();
+          }
         }
       }
     }
 
-    // 5. Render 3D Surface Polygons (Back to Front painter's order)
+    // 6. 3D Surface Mesh with Depth Sorting (Painter's Algorithm)
+    const quads = [];
     for (let i = 0; i < N - 1; i++) {
       for (let j = 0; j < N - 1; j++) {
+        const x0 = (j / (N - 1)) * 10.0;
+        const x1 = ((j + 1) / (N - 1)) * 10.0;
+        const y0 = (i / (N - 1)) * 15.0;
+        const y1 = ((i + 1) / (N - 1)) * 15.0;
+
         const z00 = Z[i][j];
         const z01 = Z[i][j + 1];
-        const z11 = Z[i + 1][j + 1];
         const z10 = Z[i + 1][j];
+        const z11 = Z[i + 1][j + 1];
 
-        const avgZ = (z00 + z01 + z11 + z10) / 4.0;
-        const tColor = (avgZ - zMin) / zSpan;
+        const avgZ = (z00 + z01 + z10 + z11) * 0.25;
+        const p00 = project3D(x0, y0, z00);
+        const p01 = project3D(x1, y0, z01);
+        const p11 = project3D(x1, y1, z11);
+        const p10 = project3D(x0, y1, z10);
 
-        const p00 = project3D(j, i, z00);
-        const p01 = project3D(j + 1, i, z01);
-        const p11 = project3D(j + 1, i + 1, z11);
-        const p10 = project3D(j, i + 1, z10);
+        const avgDepth = (p00.depth + p01.depth + p11.depth + p10.depth) * 0.25;
 
-        ctx.fillStyle = viridisColor(tColor);
-        ctx.strokeStyle = 'rgba(15, 23, 42, 0.25)';
-        ctx.lineWidth = 0.4;
-
-        ctx.beginPath();
-        ctx.moveTo(p00[0], p00[1]);
-        ctx.lineTo(p01[0], p01[1]);
-        ctx.lineTo(p11[0], p11[1]);
-        ctx.lineTo(p10[0], p10[1]);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
+        quads.push({
+          p00, p01, p11, p10,
+          avgDepth,
+          avgZ,
+          tNorm: (avgZ - zMin) / (zSpan || 1)
+        });
       }
     }
 
-    // 6. Draw 9 Compass Measurement Nodes
-    const compassNodes = [
-      { id: 1, name: "NW", r: 0, c: 0 },
-      { id: 2, name: "N",  r: 0, c: 1 },
-      { id: 3, name: "NE", r: 0, c: 2 },
-      { id: 4, name: "W",  r: 1, c: 0 },
-      { id: 5, name: "C",  r: 1, c: 1 },
-      { id: 6, name: "E",  r: 1, c: 2 },
-      { id: 7, name: "SW", r: 2, c: 0 },
-      { id: 8, name: "S",  r: 2, c: 1 },
-      { id: 9, name: "SE", r: 2, c: 2 },
-    ];
+    // Sort from farthest to closest (highest depth value first)
+    quads.sort((a, b) => b.avgDepth - a.avgDepth);
 
-    compassNodes.forEach(node => {
-      // Map 3x3 coords to dense grid coords
-      const dj = node.c === 0 ? 0 : node.c === 1 ? Math.floor((N - 1) / 2) : N - 1;
-      const di = node.r === 0 ? 0 : node.r === 1 ? Math.floor((N - 1) / 2) : N - 1;
-      const val = grid3x3[node.r][node.c] || 0;
+    // Draw quads
+    quads.forEach((q) => {
+      ctx.fillStyle = viridisCss(q.tNorm);
+      ctx.strokeStyle = 'rgba(0, 0, 0, 0.20)';
+      ctx.lineWidth = 0.35;
 
-      const [px, py] = project3D(dj, di, val);
-
-      // Marker shadow / drop line to bottom plane
-      const [bx, by] = project3D(dj, di, zBottom);
-      ctx.strokeStyle = 'rgba(148, 163, 184, 0.6)';
-      ctx.setLineDash([2, 2]);
       ctx.beginPath();
-      ctx.moveTo(px, py);
-      ctx.lineTo(bx, by);
-      ctx.stroke();
-      ctx.setLineDash([]);
-
-      // Red node circle
-      ctx.beginPath();
-      ctx.arc(px, py, 4.5, 0, Math.PI * 2);
-      ctx.fillStyle = '#ef4444';
+      ctx.moveTo(q.p00.sx, q.p00.sy);
+      ctx.lineTo(q.p01.sx, q.p01.sy);
+      ctx.lineTo(q.p11.sx, q.p11.sy);
+      ctx.lineTo(q.p10.sx, q.p10.sy);
+      ctx.closePath();
       ctx.fill();
-      ctx.strokeStyle = '#ffffff';
-      ctx.lineWidth = 1.5;
       ctx.stroke();
-
-      // Node label
-      ctx.font = 'bold 9px sans-serif';
-      ctx.fillStyle = '#0f172a';
-      ctx.textAlign = 'center';
-      ctx.fillText(`${node.name}: ${Math.round(val)}`, px, py - 7);
     });
 
-    // 7. Headers & Axis Labels
-    ctx.font = 'bold 12px sans-serif';
-    ctx.fillStyle = '#0f172a';
-    ctx.textAlign = 'left';
-    ctx.fillText(`${participantName} • ${title}`, 20, 24);
+    // 7. 9 Anatomical Compass Nodes on Surface (P1-P9)
+    const compassNodes = [
+      { id: 1, lbl: 'NW (P1)', r: 0, c: 0, x: 0.0, y: 0.0 },
+      { id: 2, lbl: 'N (P2)', r: 0, c: 1, x: 5.0, y: 0.0 },
+      { id: 3, lbl: 'NE (P3)', r: 0, c: 2, x: 10.0, y: 0.0 },
+      { id: 4, lbl: 'W (P4)', r: 1, c: 0, x: 0.0, y: 7.5 },
+      { id: 5, lbl: 'C (P5)', r: 1, c: 1, x: 5.0, y: 7.5 },
+      { id: 6, lbl: 'E (P6)', r: 1, c: 2, x: 10.0, y: 7.5 },
+      { id: 7, lbl: 'SW (P7)', r: 2, c: 0, x: 0.0, y: 15.0 },
+      { id: 8, lbl: 'S (P8)', r: 2, c: 1, x: 5.0, y: 15.0 },
+      { id: 9, lbl: 'SE (P9)', r: 2, c: 2, x: 10.0, y: 15.0 }
+    ];
 
-    ctx.font = '10px sans-serif';
-    ctx.fillStyle = '#64748b';
-    ctx.fillText(`3D Plantar Tissue Stiffness Surface (${stageLabel}) • Quiver Gradient Direction`, 20, 40);
+    compassNodes.forEach((node) => {
+      const zVal = grid3x3[node.r][node.c];
+      const pt = project3D(node.x, node.y, zVal);
 
-    // Colorbar on right
-    const cbX = W - 35;
-    const cbY = 60;
-    const cbW = 12;
-    const cbH = 140;
+      // Red scatter marker
+      ctx.fillStyle = '#ef4444';
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 1.0;
+      ctx.beginPath();
+      ctx.arc(pt.sx, pt.sy, 4.5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
 
-    for (let h = 0; h < cbH; h++) {
-      const t = 1.0 - h / cbH;
-      ctx.fillStyle = viridisColor(t);
-      ctx.fillRect(cbX, cbY + h, cbW, 1);
-    }
-    ctx.strokeStyle = '#94a3b8';
-    ctx.strokeRect(cbX, cbY, cbW, cbH);
+      // Text label above marker
+      ctx.font = 'bold 9px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillStyle = '#0f172a';
+      ctx.fillText(node.lbl, pt.sx, pt.sy - 8);
+      ctx.font = '8px sans-serif';
+      ctx.fillStyle = '#475569';
+      ctx.fillText(`${zVal.toFixed(0)}`, pt.sx, pt.sy + 12);
+    });
 
-    ctx.font = '9px sans-serif';
-    ctx.fillStyle = '#475569';
-    ctx.textAlign = 'right';
-    ctx.fillText(`${Math.round(zMax)}`, cbX - 4, cbY + 8);
-    ctx.fillText(`${Math.round(zMin)}`, cbX - 4, cbY + cbH);
+    // 8. Front Box Frame & Axis Ticks
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(f00.sx, f00.sy);
+    ctx.lineTo(f10.sx, f10.sy);
+    ctx.lineTo(f11.sx, f11.sy);
+    ctx.stroke();
 
+    ctx.beginPath();
+    ctx.moveTo(f00.sx, f00.sy);
+    ctx.lineTo(c00.sx, c00.sy);
+    ctx.stroke();
+
+    // Axis Labels
+    ctx.font = 'bold 9.5px sans-serif';
+    ctx.fillStyle = '#1e293b';
+
+    // X Axis Label
+    const xMid = project3D(5.0, 0, zBottom);
+    ctx.textAlign = 'center';
+    ctx.fillText('Plantar Width (cm) [Lateral - Medial]', xMid.sx, xMid.sy + 26);
+
+    // Y Axis Label
+    const yMid = project3D(10.0, 7.5, zBottom);
+    ctx.fillText('Plantar Length (cm) [Posterior - Anterior]', yMid.sx + 45, yMid.sy + 16);
+
+    // Z Axis Label
+    const zMid = project3D(0, 0, (zBottom + zTop) * 0.5);
     ctx.save();
-    ctx.translate(cbX + 22, cbY + cbH / 2);
-    ctx.rotate(Math.PI / 2);
-    ctx.font = '9px sans-serif';
+    ctx.translate(zMid.sx - 35, zMid.sy);
+    ctx.rotate(-Math.PI / 2);
     ctx.textAlign = 'center';
     ctx.fillText('Dynamic Stiffness', 0, 0);
     ctx.restore();
 
+    // 9. Scientific Colorbar on the Right
+    const cbX = W - 55;
+    const cbY = 90;
+    const cbW = 14;
+    const cbH = H - 180;
+
+    for (let y = 0; y < cbH; y++) {
+      const tNorm = 1.0 - y / cbH;
+      ctx.fillStyle = viridisCss(tNorm);
+      ctx.fillRect(cbX, cbY + y, cbW, 1);
+    }
+
+    ctx.strokeStyle = '#334155';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(cbX, cbY, cbW, cbH);
+
+    // Colorbar Ticks
+    ctx.font = '8.5px monospace';
+    ctx.fillStyle = '#334155';
+    ctx.textAlign = 'left';
+    ctx.fillText(`${zMax.toFixed(0)}`, cbX + cbW + 5, cbY + 6);
+    ctx.fillText(`${((zMin + zMax) * 0.5).toFixed(0)}`, cbX + cbW + 5, cbY + cbH / 2 + 3);
+    ctx.fillText(`${zMin.toFixed(0)}`, cbX + cbW + 5, cbY + cbH);
+
+    // Colorbar Title
+    ctx.save();
+    ctx.translate(cbX + cbW + 28, cbY + cbH / 2);
+    ctx.rotate(Math.PI / 2);
+    ctx.font = 'bold 9.5px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('Dynamic Stiffness', 0, 0);
+    ctx.restore();
+
+    // 10. Publication Figure Title
+    ctx.textAlign = 'center';
+    ctx.font = 'bold 13px sans-serif';
+    ctx.fillStyle = '#0f172a';
+    ctx.fillText(`${participantName} • ${title}`, W * 0.44, 28);
+    ctx.font = '11px sans-serif';
+    ctx.fillStyle = '#475569';
+    ctx.fillText(`3D Plantar Tissue Stiffness Surface (${stageLabel})`, W * 0.44, 46);
+
   }, [grid3x3, title, stageLabel, participantName, width, height]);
 
+  // Handle Download (PNG)
   const handleDownload = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
     setDownloading(true);
     try {
-      const dataUrl = canvas.toDataURL('image/png');
-      const a = document.createElement('a');
-      a.href = dataUrl;
       const cleanTitle = title.replace(/[^a-zA-Z0-9_-]/g, '_');
-      a.download = `${participantName}_${cleanTitle}_${stageLabel.replace(/\s+/g, '_')}_3D_Surface.png`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
+      const filename = `${participantName}_${cleanTitle}_${stageLabel.replace(/\s+/g, '_')}_3D_Surface.png`;
+
+      // If in Matplotlib mode and image available, download exact Matplotlib PNG
+      if (matplotlibImg && (viewMode === 'hd' || viewMode === 'auto')) {
+        const a = document.createElement('a');
+        a.href = matplotlibImg;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        return;
+      }
+
+      // Fallback: download high-precision Canvas
+      const canvas = canvasRef.current;
+      if (canvas) {
+        const dataUrl = canvas.toDataURL('image/png');
+        const a = document.createElement('a');
+        a.href = dataUrl;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
     } catch (e) {
-      console.error('Error saving canvas:', e);
+      console.error('Error saving 3D surface plot:', e);
     } finally {
       setDownloading(false);
     }
   };
 
+  const isShowingHd = (viewMode === 'hd' || (viewMode === 'auto' && matplotlibImg));
+
   return (
-    <div className="bg-white rounded-xl border border-slate-200 p-3 shadow-2xs relative">
-      <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-100">
+    <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs relative space-y-3">
+      {/* Header bar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-          <span className="text-xs font-bold text-slate-800">
+          <h4 className="text-xs font-bold text-slate-800">
             3D Plantar Surface Mesh ({stageLabel})
-          </span>
+          </h4>
+          {matplotlibImg && (
+            <span className="text-[10px] bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full font-semibold flex items-center gap-1">
+              <Sparkles className="w-3 h-3 text-indigo-600" />
+              Matplotlib Publication HD
+            </span>
+          )}
         </div>
-        <button
-          onClick={handleDownload}
-          disabled={downloading}
-          className="flex items-center gap-1.5 px-2.5 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-md text-[11px] font-semibold transition-colors cursor-pointer"
-          title="Download high-resolution 3D surface plot (PNG)"
-        >
-          <Download className="w-3.5 h-3.5 text-slate-600" />
-          <span>{downloading ? 'Exporting...' : 'Save 3D PNG'}</span>
-        </button>
+
+        <div className="flex items-center gap-2">
+          {/* Mode Switcher */}
+          {matplotlibImg && (
+            <div className="grid grid-cols-2 gap-1 bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-[11px]">
+              <button
+                type="button"
+                onClick={() => setViewMode('hd')}
+                className={`py-1 px-2 rounded font-bold transition-all cursor-pointer ${
+                  isShowingHd
+                    ? 'bg-white text-indigo-700 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Tampilkan grafik 3D Matplotlib kualitas publikasi ilmiah"
+              >
+                HD Plot
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('canvas')}
+                className={`py-1 px-2 rounded font-bold transition-all cursor-pointer ${
+                  !isShowingHd
+                    ? 'bg-white text-indigo-700 shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title="Tampilkan kanvas grafis 3D interaktif"
+              >
+                Canvas 3D
+              </button>
+            </div>
+          )}
+
+          {/* Download Button */}
+          <button
+            onClick={handleDownload}
+            disabled={downloading}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-900 hover:bg-black text-white rounded-lg text-[11px] font-semibold transition-colors cursor-pointer shadow-2xs"
+            title="Download gambar 3D Surface beresolusi tinggi (PNG)"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>{downloading ? 'Exporting...' : 'Save 3D PNG'}</span>
+          </button>
+        </div>
       </div>
 
-      <div className="flex justify-center overflow-hidden rounded-lg bg-slate-50 border border-slate-200">
-        <canvas
-          ref={canvasRef}
-          width={width}
-          height={height}
-          className="max-w-full h-auto"
-        />
+      {/* Main Plot Area */}
+      <div className="relative flex justify-center items-center overflow-hidden rounded-xl bg-slate-50 border border-slate-200 min-h-[420px]">
+        {isShowingHd && matplotlibImg ? (
+          <img
+            src={matplotlibImg}
+            alt="3D Plantar Tissue Stiffness Surface"
+            className="w-full h-auto object-contain max-h-[520px] transition-all"
+          />
+        ) : (
+          <canvas
+            ref={canvasRef}
+            width={width}
+            height={height}
+            className="max-w-full h-auto"
+          />
+        )}
+
+        {loadingPython && (
+          <div className="absolute top-3 right-3 bg-white/90 backdrop-blur-xs px-2.5 py-1 rounded-full border border-slate-200 text-[10px] text-slate-600 font-medium flex items-center gap-1.5 shadow-2xs">
+            <RefreshCw className="w-3 h-3 animate-spin text-indigo-600" />
+            <span>Memperbarui HD Plot...</span>
+          </div>
+        )}
       </div>
 
-      <div className="mt-2 flex items-center justify-between text-[10px] text-slate-400">
-        <span>Mesh: Viridis Colormap • Bottom Quiver: Gradient Flow</span>
-        <span>Anatomical Nodes: Red Dots P1-P9</span>
+      {/* Footer Info */}
+      <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-500 pt-1">
+        <span className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-blue-500" />
+          Vektor Quiver: Aliran Gradien Spasial
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full bg-red-500" />
+          Titik Kompas: 9 Lokasi Anatomis (P1 - P9)
+        </span>
+        <span className="font-mono text-[10px] text-slate-400">
+          Proyeksi 3D: elev=28°, azim=-55° • Viridis Colormap
+        </span>
       </div>
     </div>
   );
