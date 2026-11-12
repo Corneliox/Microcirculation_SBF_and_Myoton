@@ -280,7 +280,7 @@ export function createMyotonWorkbook(participantInput = ['KYLE'], includeSampleD
     ['   - Entry 8: South (S)       -> Grid [Row 2, Col 1]'],
     ['   - Entry 9: South-East (SE) -> Grid [Row 2, Col 2]'],
     [''],
-    ['5. Metric Units: Dynamic Stiffness (N/m). Baseline typically ranges 450 - 950 N/m.']
+    ['5. Metric Units: Dynamic Stiffness. Baseline typically ranges 450 - 950.']
   ];
   const wsGuide = XLSX.utils.aoa_to_sheet(guideRows);
   XLSX.utils.book_append_sheet(wb, wsGuide, 'Format_Guide');

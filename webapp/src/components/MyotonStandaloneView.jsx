@@ -160,7 +160,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                 )}
               </div>
               <p className="text-xs text-gray-500">
-                Spatial assessment of 9-point dynamic tissue stiffness (N/m), oscillation frequency, and decrement
+                Spatial assessment of 9-point dynamic tissue stiffness, oscillation frequency, and decrement
               </p>
             </div>
           </div>
@@ -327,7 +327,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                 {aggregationMethod === 'median' ? 'Baseline Stiffness (Median)' : 'Baseline Stiffness (Mean)'}
               </span>
               <div className="text-2xl font-black text-gray-900 mt-2">
-                {myotonAnalysis.meanBefore} <span className="text-xs text-gray-500 font-normal">N/m</span>
+                {myotonAnalysis.meanBefore}
               </div>
               <p className="text-[10px] text-gray-400 mt-1">
                 {aggregationMethod === 'median' ? 'Pre-stimulus median of 9 points' : 'Pre-stimulation resting stiffness'}
@@ -339,7 +339,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                 {aggregationMethod === 'median' ? 'Post-Stimulus Stiffness (Median)' : 'Post-Stimulus Stiffness (Mean)'}
               </span>
               <div className="text-2xl font-black text-indigo-600 mt-2">
-                {myotonAnalysis.meanAfter} <span className="text-xs text-gray-500 font-normal">N/m</span>
+                {myotonAnalysis.meanAfter}
               </div>
               <p className="text-[10px] text-gray-400 mt-1">
                 {aggregationMethod === 'median' ? 'Post-stimulus median of 9 points' : 'Post-stimulation tissue tone'}
@@ -351,7 +351,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                 {aggregationMethod === 'median' ? 'Median Δ Stiffness' : 'Mean Δ Stiffness'}
               </span>
               <div className="text-2xl font-black text-amber-600 mt-2">
-                {myotonAnalysis.meanDelta >= 0 ? `+${myotonAnalysis.meanDelta}` : myotonAnalysis.meanDelta} <span className="text-xs text-gray-500 font-normal">N/m</span>
+                {myotonAnalysis.meanDelta >= 0 ? `+${myotonAnalysis.meanDelta}` : myotonAnalysis.meanDelta}
               </div>
               <p className="text-[10px] text-gray-400 mt-1">Net mechanical stiffness change</p>
             </div>
@@ -371,7 +371,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
               title={`Δ Myoton Tissue Stiffness (${selectedFreq}) • [${aggregationMethod === 'median' ? 'Median / Nilai Tengah' : 'Mean / Average'}]`}
               subtitle={`Spatial 3×3 matrix mapping sites 1 to 9 (${aggregationMethod === 'median' ? 'Triplicate Middle Value: n>min & n<max' : 'Triplicate Arithmetic Mean'})`}
               metricName="Stiffness"
-              unit="N/m"
+              unit=""
               dataCells={myotonAnalysis.cells}
               isStiffness={true}
             />
@@ -385,7 +385,7 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                   9-Point Plantar Compass Coordinates ({selectedFreq})
                 </h3>
                 <p className="text-xs text-gray-500">
-                  {myotonAnalysis.title} • Units: Dynamic Stiffness (N/m) • Estimator: {aggregationMethod === 'median' ? 'Median (Middle Value)' : 'Mean (Average)'}
+                  {myotonAnalysis.title} • Units: Dynamic Stiffness • Estimator: {aggregationMethod === 'median' ? 'Median (Middle Value)' : 'Mean (Average)'}
                 </p>
               </div>
             </div>
@@ -398,13 +398,13 @@ export default function MyotonStandaloneView({ myotonData, onUploadMyoton }) {
                     <th className="py-2.5 px-4">Compass Direction</th>
                     <th className="py-2.5 px-4">Grid Pos</th>
                     <th className="py-2.5 px-4 text-right">
-                      {aggregationMethod === 'median' ? 'Stiff Before [Median]' : showTriplicates ? 'Stiff Before [Mean ± SD]' : 'Stiff Before (N/m)'}
+                      {aggregationMethod === 'median' ? 'Stiff Before [Median]' : showTriplicates ? 'Stiff Before [Mean ± SD]' : 'Stiff Before'}
                     </th>
                     <th className="py-2.5 px-4 text-right">
-                      {aggregationMethod === 'median' ? 'Stiff After [Median]' : showTriplicates ? 'Stiff After [Mean ± SD]' : 'Stiff After (N/m)'}
+                      {aggregationMethod === 'median' ? 'Stiff After [Median]' : showTriplicates ? 'Stiff After [Mean ± SD]' : 'Stiff After'}
                     </th>
                     <th className="py-2.5 px-4 text-right font-bold">
-                      {aggregationMethod === 'median' ? 'Median Δ Stiff (N/m)' : 'Mean Δ Stiff (N/m)'}
+                      {aggregationMethod === 'median' ? 'Median Δ Stiff' : 'Mean Δ Stiff'}
                     </th>
                     <th className="py-2.5 px-4 text-right font-bold">% Change</th>
                     {showTriplicates ? (

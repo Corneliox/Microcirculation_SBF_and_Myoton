@@ -129,7 +129,7 @@ export default function HelpGuideModal({ isOpen, onClose }) {
                       Myotonometer Plantar Biomechanics
                     </h4>
                     <p className="text-slate-600">
-                      Applies controlled mechanical micro-impulses to quantify non-invasive tissue viscoelastic properties: <strong>Dynamic Stiffness (S, in N/m)</strong>, Oscillation Frequency (F, in Hz), and Logarithmic Decrement (D).
+                      Applies controlled mechanical micro-impulses to quantify non-invasive tissue viscoelastic properties: <strong>Dynamic Stiffness (S)</strong>, Oscillation Frequency (F, in Hz), and Logarithmic Decrement (D).
                     </p>
                   </div>
                 </div>
@@ -280,7 +280,7 @@ export default function HelpGuideModal({ isOpen, onClose }) {
                     </p>
                     <div className="font-mono text-[11px] bg-white p-2.5 rounded border border-slate-200 text-slate-800 space-y-1">
                       <div>Columns: Point ID (1..9), before1_30, after1_30, before1_50, after1_50, before1_100, after1_100, T1, M1</div>
-                      <div>Values: Dynamic Stiffness (S, in N/m)</div>
+                      <div>Values: Dynamic Stiffness (S)</div>
                     </div>
                   </div>
 

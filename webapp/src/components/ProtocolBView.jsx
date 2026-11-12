@@ -478,12 +478,12 @@ export default function ProtocolBView({ microData, myotonData, onOpenHelp, onUpl
               <span className="text-2xl font-black text-amber-600">
                 {analysisResult.means.stiffDeltaMean >= 0 ? `+${analysisResult.means.stiffDeltaMean}` : analysisResult.means.stiffDeltaMean}
               </span>
-              <span className="text-xs text-gray-500">N/m (Mean &Delta;)</span>
+              <span className="text-xs text-gray-500">(Mean &Delta;)</span>
             </div>
           </div>
           <div className="mt-4 pt-3 border-t border-gray-100 flex justify-between text-xs text-gray-600">
-            <span>Before: <strong className="text-gray-900">{analysisResult.means.stiffBeforeMean} N/m</strong></span>
-            <span>After: <strong className="text-gray-900">{analysisResult.means.stiffAfterMean} N/m</strong></span>
+            <span>Before: <strong className="text-gray-900">{analysisResult.means.stiffBeforeMean}</strong></span>
+            <span>After: <strong className="text-gray-900">{analysisResult.means.stiffAfterMean}</strong></span>
           </div>
         </div>
       </div>
@@ -503,7 +503,7 @@ export default function ProtocolBView({ microData, myotonData, onOpenHelp, onUpl
           title="&Delta; Myoton Tissue Stiffness"
           subtitle="Biomechanical dynamic stiffness change per compass site (After - Before)"
           metricName="Stiffness"
-          unit="N/m"
+          unit=""
           dataCells={analysisResult.cells}
           isStiffness={true}
         />
@@ -532,9 +532,9 @@ export default function ProtocolBView({ microData, myotonData, onOpenHelp, onUpl
                 <th className="py-2.5 px-4 text-right">Flux After (PU)</th>
                 <th className="py-2.5 px-4 text-right font-bold">&Delta; Flux (PU)</th>
                 <th className="py-2.5 px-4 text-right">Flux &Delta; %</th>
-                <th className="py-2.5 px-4 text-right">Stiff Before (N/m)</th>
-                <th className="py-2.5 px-4 text-right">Stiff After (N/m)</th>
-                <th className="py-2.5 px-4 text-right font-bold">&Delta; Stiff (N/m)</th>
+                <th className="py-2.5 px-4 text-right">Stiff Before</th>
+                <th className="py-2.5 px-4 text-right">Stiff After</th>
+                <th className="py-2.5 px-4 text-right font-bold">&Delta; Stiff</th>
                 <th className="py-2.5 px-4 text-right">Stiff &Delta; %</th>
               </tr>
             </thead>
