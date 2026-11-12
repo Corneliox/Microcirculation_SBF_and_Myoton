@@ -6,7 +6,7 @@ cd /d "%~dp0"
 
 echo ================================================================================
 echo  MICROCIRCULATION & MYOTON SUITE - SINGLE ELECTRON INSTALLER BUILDER
-echo  Version: 2.7.0
+echo  Version: 3.0.0
 echo ================================================================================
 echo.
 
@@ -77,9 +77,9 @@ if !ERRORLEVEL! NEQ 0 (
 
 echo.
 echo ================================================================================
-echo  SUKSES: Single Installer v2.7.0 berhasil dibuat!
+echo  SUKSES: Single Installer v3.0.0 berhasil dibuat!
 echo  Lokasi installer:
-echo  !WEBAPP_DIR!\release\Microcirculation ^& Myoton Suite Setup 2.7.0.exe
+echo  !WEBAPP_DIR!\release\Microcirculation ^& Myoton Suite Setup 3.0.0.exe
 echo ================================================================================
 echo.
 pause

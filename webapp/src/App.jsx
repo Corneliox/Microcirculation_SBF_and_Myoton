@@ -197,7 +197,7 @@ export default function App() {
                     Microcirculation & Myotonometer Research
                   </h1>
                   <span className="text-[10px] font-semibold tracking-wide bg-indigo-50 text-indigo-700 border border-indigo-200 px-2 py-0.5 rounded-full">
-                    v2.7.0 Desktop & Web
+                    v3.0.0 Desktop & Web
                   </span>
                 </div>
                 <p className="text-xs text-slate-500 hidden sm:block">

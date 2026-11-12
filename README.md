@@ -16,10 +16,51 @@ A high-performance biomedical signal processing and biomechanical analytics plat
 This research software integrates optical microcirculation measurements with mechanical tissue diagnostics:
 
 1. **Laser-Doppler Skin Blood Flow (SBF):** Continuous ~40 Hz perfusion flux recordings monitoring microvascular vasodilation and vasomotion in response to acoustic/electrical stimulation (30 Hz, 50 Hz, 100 Hz).
-2. **Myotonometer Plantar Tissue Biomechanics:** Spatial 9-point grid assessment of muscle/dermal mechanical properties (Oscillation Frequency $F$, Dynamic Stiffness $S$ [N/m], and Logarithmic Decrement $D$) across anatomical plantar coordinates.
+2. **Myotonometer Plantar Tissue Biomechanics:** Spatial 9-point grid assessment of muscle/dermal mechanical properties (Oscillation Frequency $F$, Dynamic Stiffness $S$, and Logarithmic Decrement $D$) across anatomical plantar coordinates.
 3. **Statistical Robustness & Sensitivity Testing:** One-way repeated-measures ANOVA, effect sizes ($\eta^2$), paired Wilcoxon signed-rank / Student's t-tests, and Jackknife (leave-one-out) subject removal simulations.
 
 ---
+
+
+---
+
+## 🚀 Version 3.0.0 (v3.0.0) Major Release Highlights
+
+Version 3.0.0 introduces a fundamental architectural upgrade focused on multi-subject clinical workflows, publication-grade 3D surface modeling, automated format diagnostics, and bulk reporting:
+
+* **👥 Multi-Subject Session & Bulk Ingestion:**
+  * Manage multiple clinical participants concurrently in a single session without virtual foot-splitting or key collisions.
+  * Ingest single workbooks via `[+ Add Participant]` or multiple workbooks via `[Bulk Upload (.xlsx)]` and native Drag-and-Drop.
+  * Individual delete/trash actions to remove corrupted or duplicate records instantly.
+
+* **📑 iLovePDF-Style Modular Accordion UI:**
+  * Minimalist, card-based interface providing a clean overview of all loaded participants.
+  * Expandable accordion cards revealing individual clinical protocols (Protocols 1 to 6), summary cards, heatmaps, and 3D surface plots.
+
+* **🛡️ Real-Time Format Validator & Diagnostic Taxonomy:**
+  * Interactive status badges on each participant card:
+    * `🟢 Standard Format Verified` (`PERFECT_MATCH`): Full 6 protocols, complete 9 triplicate points.
+    * `🟡 Format Warning` (`INCOMPLETE_DATA`, `LEGACY_FORMAT`): Partial protocols or legacy format.
+    * `🔴 Invalid / Corrupted Format` (`FORMULA_ERRORS`, `MISSING_PROTOCOLS`, `EMPTY_OR_UNREADABLE`): Formula errors (`#VALUE!`), missing headers, or empty files.
+    * `⚪ Unknown Format Issue` (`UNKNOWN_STRUCTURE`): Unrecognized schema.
+  * Clickable badge opens an actionable inspection modal with detailed issue breakdowns and template download.
+
+* **⚖️ Triplicate Estimator: Arithmetic Mean vs. Median:**
+  * Seamlessly toggle between **Arithmetic Mean (Average)** and **Median (Middle Value: $n > \min \ \& \ n < \max$)**.
+  * Dynamic re-calculation of 9-point baseline, post-stimulus, delta, and compliance metrics with `(Mid: X)` visual highlighting.
+
+* **🏔️ Publication-Grade 3D Surface Visualizer:**
+  * Dual-Engine architecture: Matplotlib 150-DPI publication plots (via Python IPC) and client-side 3D mathematical canvas.
+  * Replicates exact publication specifications (`isolated_FLIR0207_m2_3_3d_surface.png`): Elevation $28^\circ$, Azimuth $-55^\circ$, 3D bounding box with projection wall planes, continuous Viridis colormap, 10-level bottom-plane contours, blue gradient quiver vectors (`#0055ff`), and 9 red anatomical compass nodes (P1-P9).
+  * 1-click `[Save 3D PNG]` export.
+
+* **📦 Full ZIP Bundle Exporter:**
+  * `[📦 Export All (.ZIP: Excel + 3D PNGs)]`: Packages `FormatOutput.xlsx` (with 3 clinical blocks: Stiffness Max/Min/Mean/Median, Gradient Max/Min/Mean/Median, and Direction Modus across up to 15 subjects) AND all Before/After 3D Surface PNG plots into a unified `.zip` archive.
+  * `[📊 Excel Only]` for rapid numerical export.
+
+* **🌐 Full English Standardization & Strict Removal of N/m Unit:**
+  * Complete English localization across all UI dialogs, tooltips, and tables.
+  * Absolute removal of `N/m` units across all modules in compliance with unitless dynamic stiffness guidelines.
 
 ## ✨ Features & Capabilities
 
@@ -39,17 +80,17 @@ This research software integrates optical microcirculation measurements with mec
 * **Sampling Rate & Dwell Configuration:**
   * Default sampling frequency: **40 Hz** (1 sample = 0.025 s / 25 ms).
   * Fully configurable sampling rate ($f_s$) and dwell separation window duration (seconds).
-* **Dual Spatial Heatmaps:** Side-by-side $3 \times 3$ interactive matrix of $\Delta\text{Flux}$ (PU) vs $\Delta\text{Stiffness}$ (N/m).
+* **Dual Spatial Heatmaps:** Side-by-side $3 \times 3$ interactive matrix of $\Delta\text{Flux}$ (PU) vs $\Delta\text{Stiffness}$.
 * **Single & Multi-Subject Group Pooling:** Analyze single participants or pool all subjects simultaneously (`🌐 All Subjects Combined`).
 * **Standalone Modality Analysis Tabs (v2.4.0):**
   * **SBF Standalone Tab:** Process Laser-Doppler perfusion signals alone (9 dwell kinetics, plateau estimators, % vasodilation) without requiring Myoton data.
   * **Myoton Standalone Tab:** Process tissue biomechanics alone (9-point spatial matrix, dynamic stiffness $S$, $T_1$, $M_1$, % softening) without requiring SBF data.
-* **Multi-Protocol & Triplicates Support (v2.5.0 - v2.7.0):**
+* **Multi-Protocol & Triplicates Support (v2.5.0 - v3.0.0):**
   * Automatic detection of multi-protocol format (`KYLE OCT.xlsx` / `NewFormat.xlsx` / OCT Foot Measurement Record).
   * Ingests 6 clinical protocols (1 Hz, 50 Hz • 30%, 50%, 80% • Left Foot vs Right Foot).
   * Automatically aggregates triplicate measurements ($E_1, E_2, E_3$ Before and After) with Mean $\pm$ SD, $\Delta S$, and CV% reliability tracking.
-* **Standalone 1-Click Desktop Installer & Official Template (v2.7.0):**
-  * **Single Windows Desktop Installer:** 1-click NSIS Installer (`Microcirculation & Myoton Suite Setup 2.7.0.exe`) bundling the entire Electron app and self-contained native Python backend (`analyzer.exe`) without needing external Python installed.
+* **Standalone 1-Click Desktop Installer & Official Template (v3.0.0):**
+  * **Single Windows Desktop Installer:** 1-click NSIS Installer (`Microcirculation & Myoton Suite Setup 3.0.0.exe`) bundling the entire Electron app and self-contained native Python backend (`analyzer.exe`) without needing external Python installed.
   * **Official Blank Template (`NewFormat.xlsx`):** Direct 1-click download of the official blank data collection template across all UI entry points.
 * **One-Click Batch Test Runners (.bat):**
   * `test_kyle_dataset.bat`: Automated Python & Node.js verification test for `KYLE OCT.xlsx` displaying full 6-protocol summary tables.

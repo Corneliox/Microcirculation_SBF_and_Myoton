@@ -561,7 +561,7 @@ def main():
     args = parser.parse_args()
 
     if args.task == "health":
-        res = {"status": "ok", "version": "2.1.0", "python": sys.version}
+        res = {"status": "ok", "version": "3.0.0", "python": sys.version}
         print(json.dumps(res, indent=2))
         return
 
